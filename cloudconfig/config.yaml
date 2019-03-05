@@ -1,0 +1,11 @@
+BROKER_URL: pyamqp://asdf//
+
+services:
+    gce:
+        max: 5
+        min: 1
+        image_name: ubuntu-1804-bionic-v20190212a
+        vm_size: n1-standard-1
+        datacenter: us-west1-a
+        service_account_file: service_account/test_service_account_key.json
+
