@@ -105,3 +105,6 @@ venv.bak/
 
 # Google Cloud Service Account Information
 service_account/*
+.states
+.states/*
+scripts/GCE_CPU_Startup.sh
