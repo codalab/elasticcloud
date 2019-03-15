@@ -5,7 +5,7 @@ import yaml
 
 # TODO: When paramiko is updated > 2.4.2 remove this warning squelch
 import warnings
-warnings.filterwarnings(action='ignore',module='.*paramiko.*')
+warnings.filterwarnings(action='ignore', module='.*paramiko.*')
 
 class ElasticCloudAdapter:
 
@@ -38,12 +38,17 @@ class ElasticCloudAdapter:
         
         with open(ssh_config_filename) as f:
             config.parse(f)
-        
-        elastic_cloud_ssh_config = 'ElasticCloud'
-        user_config = config.lookup(elastic_cloud_ssh_config)
-        pkey_fn = user_config['identityfile'][0]
-        self.username = user_config['user']
-        self.pkey = paramiko.RSAKey.from_private_key_file(pkey_fn)#, password="placeholder")
+
+        try:
+            elastic_cloud_ssh_config = 'ElasticCloud'
+            user_config = config.lookup(elastic_cloud_ssh_config)
+            pkey_fn = user_config['identityfile'][0]
+            self.username = user_config['user']
+            self.pkey = paramiko.RSAKey.from_private_key_file(pkey_fn)#, password="placeholder")
+        except KeyError:
+            # We don't have a specific entry for this, use defaults
+            self.username = "ubuntu"
+            self.pkey = paramiko.RSAKey.from_private_key_file(os.path.expanduser("~/.ssh/id_rsa"))
 
     def _run_ssh_command(self, host, command):
         self.ssh_client.connect(host, username=self.username, pkey=self.pkey)

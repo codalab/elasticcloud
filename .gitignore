@@ -108,3 +108,4 @@ service_account/*
 .states
 .states/*
 scripts/GCE_CPU_Startup.sh
+cloudconfig/
