@@ -39,10 +39,11 @@ def dump_state(driver):
     adapter = adapter_choice(driver)
 
     states = adapter.dump_state()
-    print('\n\nNode states:\n')
-    print('{0: <30} {1}'.format('Name', 'State'))
+    click.echo('\n\nNode states:\n')
+    output_format = '{0: <30} {1}'
+    click.echo(output_format.format('Name', 'State'))
     for state in states:
-        print('{0: <30} {1}'.format(state[0], state[1]))
+        click.echo(output_format.format(state[0], state[1]))
 
 @cli.command()
 @click.argument('driver', type=click.Choice(['gce']))

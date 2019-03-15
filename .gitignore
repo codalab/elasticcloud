@@ -104,7 +104,10 @@ venv.bak/
 .mypy_cache/
 
 # Google Cloud Service Account Information
-service_account/*
-.states
-.states/*
-scripts/GCE_CPU_Startup.sh
+service_account/*.json
+
+# User configuration of the elastic cloud service
+cloud_config/config.yaml
+
+# Files for tracking node and container states
+.states/*states

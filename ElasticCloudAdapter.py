@@ -4,8 +4,10 @@ import yaml
 
 
 # TODO: When paramiko is updated > 2.4.2 remove this warning squelch
+# Last checked March 14, 2019
 import warnings
 warnings.filterwarnings(action='ignore',module='.*paramiko.*')
+
 
 class ElasticCloudAdapter:
 
@@ -19,7 +21,7 @@ class ElasticCloudAdapter:
 
     def _load_configuration(self, service_name):
         service_config = None
-        config_filename = 'cloudconfig/config.yaml'
+        config_filename = 'cloud_config/config.yaml'
 
         with open(config_filename) as f:
             service_config = yaml.load(f)
