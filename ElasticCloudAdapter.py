@@ -24,7 +24,7 @@ class ElasticCloudAdapter:
         config_filename = 'cloud_config/config.yaml'
 
         with open(config_filename) as f:
-            service_config = yaml.load(f)
+            service_config = yaml.load(f, Loader=yaml.FullLoader)
 
         self.config = service_config['services'][service_name]
     
