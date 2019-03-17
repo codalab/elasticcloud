@@ -24,3 +24,27 @@ sudo pkill -SIGHUP dockerd
 sudo -u $USER_NAME docker run --runtime=nvidia --rm nvidia/cuda:9.0-base nvidia-smi
 EOF
 
+
+
+
+
+
+
+
+
+
+
+#nvidia-docker run \
+#    -v /var/run/docker.sock:/var/run/docker.sock \
+#    -v /var/lib/nvidia-docker/nvidia-docker.sock:/var/lib/nvidia-docker/nvidia-docker.sock \
+#    -v /tmp/codalab:/tmp/codalab \
+#    -d \
+#    --name compute_worker \
+#    --env-file .env \
+#    --restart unless-stopped \
+#    --log-opt max-size=50m \
+#    --log-opt max-file=3 \
+#    codalab/competitions-v1-nvidia-worker:latest
+
+
+

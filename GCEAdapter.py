@@ -1,16 +1,16 @@
 import os
 from datetime import datetime
+from paramiko import ssh_exception
 import time
 
 from ElasticCloudAdapter import ElasticCloudAdapter
 
-class GCEAdapter(ElasticCloudAdapter):
 
+class GCEAdapter(ElasticCloudAdapter):
     # Container States
     CONTAINER_RUNNING = 'RUNNING'
     CONTAINER_STOPPING = 'STOPPING'
     CONTAINER_STOPPED = 'STOPPED'
-
 
     def __init__(self):
         super().__init__('gce')
@@ -28,17 +28,17 @@ class GCEAdapter(ElasticCloudAdapter):
         if not os.path.isdir(states_directory):
             os.mkdir(states_directory)
 
-       
     def _configure(self):
         # From config.yaml
         self.service_account_key_path = self.config['service_account_file']
-        self.datacenter               = self.config['datacenter']
-        self.image                    = self.config['image_name']
-        self.size                     = self.config['vm_size']
-        self.max_nodes                = self.config['max']
-        self.min_nodes                = self.config['min']
-        self.EXPAND_CRITERION         = self.config['expand_sensitivity'] 
-        self.SHRINK_CRITERION         = self.config['shrink_sensitivity'] 
+        self.datacenter = self.config['datacenter']
+        self.image = self.config['image_name']
+        self.size = self.config['vm_size']
+        self.max_nodes = self.config['max']
+        self.min_nodes = self.config['min']
+        self.EXPAND_CRITERION = self.config['expand_sensitivity']
+        self.SHRINK_CRITERION = self.config['shrink_sensitivity']
+        self.use_gpus = self.config.get("use_gpus", False)
 
     def _load_gce_account(self):
         tmp = __import__('libcloud.compute.types', fromlist=['Provider'])
@@ -47,17 +47,16 @@ class GCEAdapter(ElasticCloudAdapter):
         get_driver = tmp.get_driver
         json = __import__('json')
         service_account = None
-        
+
         with open(self.service_account_key_path) as f:
             service_account = json.load(f)
 
         Driver = get_driver(Provider.GCE)
 
-        return Driver(service_account['client_email'], 
-        self.service_account_key_path, 
-        datacenter=self.datacenter,
-        project=service_account['project_id'])
-        
+        return Driver(service_account['client_email'],
+                      self.service_account_key_path,
+                      datacenter=self.datacenter,
+                      project=service_account['project_id'])
 
     def _get_oldest_node(self):
         # use strptime to parse node names and compare
@@ -67,7 +66,7 @@ class GCEAdapter(ElasticCloudAdapter):
         for node in nodes:
             date = datetime.strptime(node.name[4:], self.format)
             if date < oldest_date:
-               oldest_node = node 
+                oldest_node = node
         return oldest_node
 
     def _load_states(self, option):
@@ -106,7 +105,7 @@ class GCEAdapter(ElasticCloudAdapter):
         if not state_exists:
             new_state = [node_name, state]
             states.append(new_state)
-        self._store_states(states, 'container')        
+        self._store_states(states, 'container')
 
     def get_container_state(self, node_name):
         filename = "container_states"
@@ -181,15 +180,19 @@ class GCEAdapter(ElasticCloudAdapter):
             now = datetime.now()
             node_name = 'gpu-' + now.strftime(self.format)
             print('Creating new VM node...')
-            new_node = self.gce.create_node(name=node_name, size=self.size, image=self.image)
-            """
-            new_node = self.gce.create_node(name=node_name,
-                                            size=self.size, 
-                                            image=self.image, 
-                                            ex_accelerator_count=1,
-                                            ex_accelerator_type='nvidia-tesla-p100',
-                                            )
-            """
+
+            new_node_arguments = {
+                "name": node_name,
+                "size": self.size,
+                "image": self.image,
+            }
+            if self.use_gpus:
+                print("(note, we doing GPU stuff hoss)")
+                new_node_arguments["ex_on_host_maintenance"] = "TERMINATE"
+                new_node_arguments["ex_accelerator_count"] = 1
+                new_node_arguments["ex_accelerator_type"] = "nvidia-tesla-p100"
+
+            new_node = self.gce.create_node(**new_node_arguments)
 
             self.gce.wait_until_running([new_node])
 
@@ -199,7 +202,7 @@ class GCEAdapter(ElasticCloudAdapter):
             return "New node running at " + new_node.public_ips[0] + " with name " + node_name
         else:
             return "Already " + str(self.get_active_node_quantity()) + " nodes running. (max)"
-            
+
     def shrink(self):
         if self.get_node_quantity() > self.min_nodes:
             node_name = self._get_oldest_node().name
@@ -222,7 +225,7 @@ class GCEAdapter(ElasticCloudAdapter):
 
             # Mark state to "STOPPED"
             self.set_container_state(node_name, GCEAdapter.CONTAINER_STOPPED)
-            
+
             return "Destroyed node: " + node.name + "."
         else:
             return "Only " + str(self.min_nodes) + " nodes running. (min)"
@@ -236,7 +239,11 @@ class GCEAdapter(ElasticCloudAdapter):
         ips = self.get_node_ips()
         for ip in ips:
             host = ip[0]
-            self.ssh_client.connect(host, username=self.username, pkey=self.pkey)
+            try:
+                self.ssh_client.connect(host, username=self.username, pkey=self.pkey)
+            except (ssh_exception.NoValidConnectionsError, ssh_exception.AuthenticationException):
+                print("ERROR :: Could not connect to host, maybe it is spinning down?")
+                continue
 
             commands = ['ls -la /tmp/codalab | wc -l']
 
@@ -252,9 +259,9 @@ class GCEAdapter(ElasticCloudAdapter):
                 else:
                     for l in s:
                         print(l)
-                    print("stderr",stderr.readlines())
+                    print("stderr", stderr.readlines())
         return list(zip(node_names, node_states))
-    
+
     def get_next_action(self):
         """
 
@@ -297,7 +304,7 @@ class GCEAdapter(ElasticCloudAdapter):
             for n in old_nodes:
                 if int(n[2]) < self.EXPAND_CRITERION:
                     TOO_BUSY = False
-            
+
             if TOO_BUSY:
                 print('expand criterion met')
                 next_action = ElasticCloudAdapter.ACTION_EXPAND

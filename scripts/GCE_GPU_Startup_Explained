@@ -6,7 +6,7 @@ sudo apt-get install nvidia-384
 
 
 Install docker:
-=====================
+===============
 curl https://get.docker.com | sudo sh
 sudo usermod -aG docker $USER
 newgrp docker
