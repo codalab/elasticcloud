@@ -61,6 +61,16 @@ class GCEAdapter(ElasticCloudAdapter):
     def _get_oldest_node(self):
         # use strptime to parse node names and compare
         nodes = self.gce.list_nodes()
+
+        # Refrain from removing nodes that don't fit the format. These nodes were probably created by the user and not by elastic cloud.
+        for n in nodes:
+            try:
+                print("Testing:", n)
+                datetime.strptime(n.name[4:], self.format)
+            except ValueError:
+                print("removing node:", n)
+                nodes.remove(n)
+
         oldest_date = datetime.strptime(nodes[0].name[4:], self.format)
         oldest_node = nodes[0]
         for node in nodes:
