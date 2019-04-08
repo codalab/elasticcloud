@@ -14,10 +14,19 @@ def adapter_choice(driver):
 def cli():
     pass
 
+
+
 @cli.command()
 @click.argument('driver', type=click.Choice(['gce']))
-def control_load(driver):
+def auto_scale(driver):
     adapter = adapter_choice(driver)
+
+    adapter.update_all_container_states()
+    states = adapter.dump_state()
+    output_format = '{0: <30} {1}'
+    click.echo(output_format.format('Name', 'State'))
+    for state in states:
+        click.echo(output_format.format(state[0], state[1]))
     
     next_action, action_count = adapter.get_next_action()
     
@@ -33,18 +42,18 @@ def control_load(driver):
             click.echo('Expanding...')
             click.echo(adapter.expand())
 
-
 @cli.command()
 @click.argument('driver', type=click.Choice(['gce']))
 def dump_state(driver):
     adapter = adapter_choice(driver)
 
+    adapter.update_all_container_states()
     states = adapter.dump_state()
-    click.echo('\nNode states:\n')
     output_format = '{0: <30} {1}'
     click.echo(output_format.format('Name', 'State'))
     for state in states:
         click.echo(output_format.format(state[0], state[1]))
+
 
 @cli.command()
 @click.argument('driver', type=click.Choice(['gce']))

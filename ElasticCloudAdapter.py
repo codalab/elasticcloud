@@ -52,8 +52,22 @@ class ElasticCloudAdapter:
             self.username = "ubuntu"
             self.pkey = paramiko.RSAKey.from_private_key_file(os.path.expanduser("~/.ssh/id_rsa"))
 
-    def _run_ssh_command(self, host, command):
+    def _connect(self, host):
+        # Delete old known hosts entry for GCE VM ip address
+        known_hosts_filename = os.path.expanduser('~/.ssh/known_hosts')
+        if os.path.exists(known_hosts_filename):
+            kh = None
+            with open(known_hosts_filename, 'r') as f:
+                kh = f.readlines()
+            with open(known_hosts_filename, 'w') as f:
+                for line in kh:
+                    line_ip = line.split()[0]
+                    if not line_ip == host:
+                        f.write(line)
         self.ssh_client.connect(host, username=self.username, pkey=self.pkey)
+
+    def _run_ssh_command(self, host, command):
+        self._connect(host)
         stdin, stdout, stderr = self.ssh_client.exec_command(command)
         return (stdin, stdout, stderr)
 

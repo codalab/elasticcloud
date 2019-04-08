@@ -111,3 +111,5 @@ cloud_config/config.yaml
 
 # Files for tracking node and container states
 .states/*states
+
+.idea/

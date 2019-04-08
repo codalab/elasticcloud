@@ -8,6 +8,7 @@ from ElasticCloudAdapter import ElasticCloudAdapter
 
 class GCEAdapter(ElasticCloudAdapter):
     # Container States
+    CONTAINER_STARTING = 'STARTING'
     CONTAINER_RUNNING = 'RUNNING'
     CONTAINER_STOPPING = 'STOPPING'
     CONTAINER_STOPPED = 'STOPPED'
@@ -52,22 +53,35 @@ class GCEAdapter(ElasticCloudAdapter):
             service_account = json.load(f)
 
         Driver = get_driver(Provider.GCE)
+        self.service_account_email = service_account['client_email']
 
         return Driver(service_account['client_email'],
                       self.service_account_key_path,
                       datacenter=self.datacenter,
                       project=service_account['project_id'])
-
-    def _get_oldest_node(self):
-        # use strptime to parse node names and compare
+   
+    def list_nodes(self):
         nodes = self.gce.list_nodes()
+        # Filter nodes that don't fit the datetime format. These nodes were probably created by the user and not by elastic cloud.
 
-        # Refrain from removing nodes that don't fit the format. These nodes were probably created by the user and not by elastic cloud.
+        unfit_nodes = []
+
         for n in nodes:
             try:
                 datetime.strptime(n.name[4:], self.format)
             except ValueError:
-                nodes.remove(n)
+                unfit_nodes.append(n)
+
+        for n in unfit_nodes:
+            nodes.remove(n)
+
+        return nodes
+        
+
+    def _get_oldest_node(self):
+        # use strptime to parse node names and compare
+        nodes = self.list_nodes()
+
 
         oldest_date = datetime.strptime(nodes[0].name[4:], self.format)
         oldest_node = nodes[0]
@@ -103,7 +117,7 @@ class GCEAdapter(ElasticCloudAdapter):
                 line = " ".join(s)
                 f.write('%s\n' % line)
 
-    def set_container_state(self, node_name, state):
+    def _set_container_state(self, node_name, state):
         states = self._load_states('container')
         state_exists = False
         for s in states:
@@ -115,7 +129,7 @@ class GCEAdapter(ElasticCloudAdapter):
             states.append(new_state)
         self._store_states(states, 'container')
 
-    def get_container_state(self, node_name):
+    def _get_container_state(self, node_name):
         filename = "container_states"
         states = self._load_states('container')
         for s in states:
@@ -133,22 +147,53 @@ class GCEAdapter(ElasticCloudAdapter):
                 new_states.append(s)
         self._store_states(new_states, 'container')
 
-    def _wait_for_node_container_shutdown(self, node_name):
+    def _update_container_state(self, node_name):
+        print("node_name:", node_name) # DEBUG
+
         # get ip from node name
         node = None
-        for n in self.gce.list_nodes():
+        for n in self.list_nodes():
             if n.name == node_name:
                 node = n
 
         ip = node.public_ips[0]
-        command = 'docker ps | wc -l'
+        command = 'sudo docker ps'
+        container_running = 1
+        (stdin, stdout, stderr) = self._run_ssh_command(ip, command)
+
+        out = stdout.readlines()
+        container_running = len(out) - 1
+
+        print('_update_container_state: container_running:', container_running)
+        if container_running:
+            #if self._get_container_state(node_name) == GCEAdapter.CONTAINER_STARTING:
+            self._set_container_state(node_name, GCEAdapter.CONTAINER_RUNNING)
+        else:
+            print(node_name + ' container not currently running.')
+    
+    def update_all_container_states(self):
+        node_names = self.get_node_names()
+        for name in node_names:
+            self._update_container_state(name)
+
+    def _wait_for_node_container_shutdown(self, node_name):
+        print("node_name:", node_name) # DEBUG
+
+        # get ip from node name
+        node = None
+        for n in self.list_nodes():
+            if n.name == node_name:
+                node = n
+
+        ip = node.public_ips[0]
+        command = 'sudo docker ps'
         container_running = 1
         while container_running:
             (stdin, stdout, stderr) = self._run_ssh_command(ip, command)
 
             out = stdout.readlines()
-            line = out[0]
-            container_running = int(line.split()[0]) - 1
+            container_running = len(out) - 1
+            print("container_running:", container_running) # DEBUG
             if container_running:
                 print('container stopping.')
             else:
@@ -157,27 +202,29 @@ class GCEAdapter(ElasticCloudAdapter):
 
     def _stop_container(self, node_name, container_name):
         node = None
-        for n in self.gce.list_nodes():
+        for n in self.list_nodes():
             if n.name == node_name:
                 node = n
 
         ip = node.public_ips[0]
-        command = 'docker stop -t 10 ' + container_name
+        command = 'sudo docker stop -t 10 ' + container_name
 
         (stdin, stdout, stderr) = self._run_ssh_command(ip, command)
+        print(stdout.readlines()) # DEBUG
+        print(stderr.readlines()) # DEBUG
 
     def get_node_quantity(self):
-        return len(self.gce.list_nodes())
+        return len(self.list_nodes())
 
     def get_node_names(self):
-        nodes = self.gce.list_nodes()
+        nodes = self.list_nodes()
         names = []
         for n in nodes:
             names.append(n.name)
         return names
 
     def get_node_ips(self):
-        nodes = self.gce.list_nodes()
+        nodes = self.list_nodes()
         ips = []
         for n in nodes:
             ips.append(n.public_ips)
@@ -193,6 +240,7 @@ class GCEAdapter(ElasticCloudAdapter):
                 "name": node_name,
                 "size": self.size,
                 "image": self.image,
+                "ex_service_accounts": [{'email': self.service_account_email, 'scopes': ['compute']}]
             }
             if self.use_gpus:
                 print("(note, we doing GPU stuff hoss)")
@@ -204,27 +252,27 @@ class GCEAdapter(ElasticCloudAdapter):
 
             self.gce.wait_until_running([new_node])
 
-            # Mark container state as "RUNNING"
-            self.set_container_state(node_name, GCEAdapter.CONTAINER_RUNNING)
+            # Mark container state as "STARTING"
+            self._set_container_state(node_name, GCEAdapter.CONTAINER_STARTING)
 
             return "New node running at " + new_node.public_ips[0] + " with name " + node_name
         else:
-            return "Already " + str(self.get_active_node_quantity()) + " nodes running. (max)"
+            return "Already " + str(self.get_node_quantity()) + " nodes running. (max)"
 
     def shrink(self):
         if self.get_node_quantity() > self.min_nodes:
             node_name = self._get_oldest_node().name
 
             # Mark state to "STOPPING"
-            self.set_container_state(node_name, GCEAdapter.CONTAINER_STOPPING)
+            self._set_container_state(node_name, GCEAdapter.CONTAINER_STOPPING)
 
             # Send SIGTERM to worker (docker stop)
-            self._stop_container(node_name, 'web')
+            self._stop_container(node_name, 'compute_worker')
             self._wait_for_node_container_shutdown(node_name)
 
             # Destroy VM
             node = None
-            for n in self.gce.list_nodes():
+            for n in self.list_nodes():
                 if n.name == node_name:
                     node = n
             print('Shutting down VM...')
@@ -232,7 +280,7 @@ class GCEAdapter(ElasticCloudAdapter):
             print('VM has shut down.')
 
             # Mark state to "STOPPED"
-            self.set_container_state(node_name, GCEAdapter.CONTAINER_STOPPED)
+            self._set_container_state(node_name, GCEAdapter.CONTAINER_STOPPED)
 
             return "Destroyed node: " + node.name + "."
         else:
@@ -243,12 +291,14 @@ class GCEAdapter(ElasticCloudAdapter):
         node_states = []
         node_names = self.get_node_names()
 
+        node_index = 0
+
         # paramiko ssh
         ips = self.get_node_ips()
         for ip in ips:
             host = ip[0]
             try:
-                self.ssh_client.connect(host, username=self.username, pkey=self.pkey)
+                self._connect(host)
             except (ssh_exception.NoValidConnectionsError, ssh_exception.AuthenticationException):
                 print("ERROR :: Could not connect to host, maybe it is spinning down?")
                 continue
@@ -260,14 +310,18 @@ class GCEAdapter(ElasticCloudAdapter):
                 s = stdout.readlines()
                 if command == 'ls -la /tmp/codalab | wc -l':
                     directory_length = int(s[0])
-                    if directory_length > 3:
+                    print("GET CONTAINER STATE:", self._get_container_state(node_names[node_index]))
+                    if directory_length > 4:
                         node_states.append('BUSY')
+                    elif self._get_container_state(node_names[node_index]) == GCEAdapter.CONTAINER_STARTING:
+                        node_states.append('MANAGED')
                     else:
                         node_states.append('NOT-BUSY')
                 else:
                     for l in s:
                         print(l)
                     print("stderr", stderr.readlines())
+            node_index += 1
         return list(zip(node_names, node_states))
 
     def get_next_action(self):
@@ -295,6 +349,7 @@ class GCEAdapter(ElasticCloudAdapter):
         stored_nodes = []
         new_nodes = self.dump_state()
         busy_count = 0
+        managed_count = 0
         for n in new_nodes:
             count = get_count(old_nodes, n)
             if n[1] == 'NOT-BUSY':
@@ -304,10 +359,12 @@ class GCEAdapter(ElasticCloudAdapter):
                     action_count += 1
             elif n[1] == 'BUSY':
                 busy_count += 1
+            elif n[1] == 'MANAGED':
+                managed_count += 1
             stored_nodes.append([n[0], n[1], str(count + 1)])
 
         # all nodes are in busy state
-        if busy_count == len(new_nodes):
+        if busy_count == len(new_nodes) - managed_count:
             TOO_BUSY = True
             for n in old_nodes:
                 if int(n[2]) < self.EXPAND_CRITERION:
