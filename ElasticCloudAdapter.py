@@ -34,10 +34,10 @@ class ElasticCloudAdapter:
                 'BROKER_URL': os.environ.get("BROKER_URL"),
                 'services': {
                     'gce': {
-                        'max': os.environ.get('GCE_MAX'),
-                        'min': os.environ.get('GCE_MIN'),
-                        'shrink_sensitivity': os.environ.get('GCE_SHRINK_SENSITIVITY', 3),
-                        'expand_sensitivity': os.environ.get('GCE_EXPAND_SENSITIVITY', 1),
+                        'max': int(os.environ.get('GCE_MAX', 3)),
+                        'min': int(os.environ.get('GCE_MIN', 1)),
+                        'shrink_sensitivity': int(os.environ.get('GCE_SHRINK_SENSITIVITY', 3)),
+                        'expand_sensitivity': int(os.environ.get('GCE_EXPAND_SENSITIVITY', 1)),
                         'image_name': os.environ.get('GCE_IMAGE_NAME'),
                         'use_gpus': os.environ.get('GCE_USE_GPUS'),
                         'vm_size': os.environ.get('GCE_VM_SIZE', "n1-standard-1"),
