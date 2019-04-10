@@ -101,7 +101,6 @@ class ElasticCloudAdapter:
             stdin, stdout, stderr = self.ssh_client.exec_command(command)
         except (ssh_exception.NoValidConnectionsError, ssh_exception.AuthenticationException):
             print("ERROR :: Could not connect to host, maybe it is spinning up/down?")
-            continue
         return (stdin, stdout, stderr)
 
     def expand(self):
