@@ -252,6 +252,7 @@ class GCEAdapter(ElasticCloudAdapter):
                 "name": node_name,
                 "size": self.size,
                 "image": self.image,
+                "location":self.datacenter,
                 "ex_service_accounts": [{'email': self.service_account_email, 'scopes': ['compute']}]
             }
             if self.use_gpus:
@@ -284,7 +285,7 @@ class GCEAdapter(ElasticCloudAdapter):
             except (ssh_exception.NoValidConnectionsError, ssh_exception.AuthenticationException):
                 print("ERROR :: Could not connect to host, maybe it is spinning down?")
 
-            stdin, stdout, stderr = self.ssh_client.exec_command(startup_command)
+            #stdin, stdout, stderr = self.ssh_client.exec_command(startup_command)
 
             print('Standard Out:')
             for line in stdout.readlines():
