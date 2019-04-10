@@ -56,7 +56,7 @@ class GCEAdapter(ElasticCloudAdapter):
             service_account = json.loads(self.service_account_key)
             self.service_account_key_path = "gce_service_key_temp_store.json"
             with open(self.service_account_key_path, "w") as f:
-                json.dump(f, service_account)
+                f.write(self.service_account_key)
 
         else:
             print(f"Reading from service account key path: {self.service_account_key_path}")
