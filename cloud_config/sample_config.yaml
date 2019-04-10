@@ -6,9 +6,9 @@ services:
         min: 1 # Minimum number of VMs running
         shrink_sensitivity: 3 # How many checks resulting in a node being not-busy before shrink is called
         expand_sensitivity: 1 # How many checks resulting in all nodes being busy before expand is called
-        image_name: codalab-nvidia-gpu-1
+        # image_name: some-image-name
         use_gpus: true
         vm_size: n1-standard-1 # Standard machine size
         datacenter: us-west1-a # Standard datacenter
-        service_account_file: service_account/eric-key.json # Path to service account json file
+        service_account_file: service_account/key.json # Path to service account json file
 

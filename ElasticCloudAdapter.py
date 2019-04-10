@@ -40,7 +40,7 @@ class ElasticCloudAdapter:
                         'expand_sensitivity': os.environ.get('GCE_EXPAND_SENSITIVITY', 1),
                         'image_name': os.environ.get('GCE_IMAGE_NAME'),
                         'use_gpus': os.environ.get('GCE_USE_GPUS'),
-                        'vm_size': os.environ.get('GCE_VM_SIZE'),
+                        'vm_size': os.environ.get('GCE_VM_SIZE', "n1-standard-1"),
                         'datacenter': os.environ.get('GCE_DATACENTER'),
                         'service_account_key': os.environ.get('GCE_SERVICE_ACCOUNT_KEY'),
                         'service_account_file': os.environ.get('GCE_SERVICE_ACCOUNT_FILE'),
