@@ -31,6 +31,7 @@ class GCEAdapter(ElasticCloudAdapter):
 
     def _configure(self):
         # From config.yaml
+        self.service_account_key = self.config['service_account_key']
         self.service_account_key_path = self.config['service_account_file']
         self.datacenter = self.config['datacenter']
         self.image = self.config['image_name']
@@ -49,17 +50,24 @@ class GCEAdapter(ElasticCloudAdapter):
         json = __import__('json')
         service_account = None
 
-        with open(self.service_account_key_path) as f:
-            service_account = json.load(f)
+        if self.service_account_key:
+            print("Loading service account key directly, not reading from file path")
+            service_account = json.load(self.service_account_key)
+        else:
+            print(f"Reading from service account key path: {self.service_account_key_path}")
+            with open(self.service_account_key_path) as f:
+                service_account = json.load(f)
 
         Driver = get_driver(Provider.GCE)
         self.service_account_email = service_account['client_email']
 
-        return Driver(service_account['client_email'],
-                      self.service_account_key_path,
-                      datacenter=self.datacenter,
-                      project=service_account['project_id'])
-   
+        return Driver(
+            service_account['client_email'],
+            self.service_account_key_path,
+            datacenter=self.datacenter,
+            project=service_account['project_id']
+        )
+
     def list_nodes(self):
         nodes = self.gce.list_nodes()
         # Filter nodes that don't fit the datetime format. These nodes were probably created by the user and not by elastic cloud.

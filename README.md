@@ -24,6 +24,9 @@ GCE_IMAGE_NAME
 GCE_USE_GPUS
 GCE_VM_SIZE
 GCE_DATACENTER
+# Actual JSON data in place of the file, this takes priority
+GCE_SERVICE_ACCOUNT_KEY
+# File path for GCE account json data
 GCE_SERVICE_ACCOUNT_FILE
 ```
 
@@ -57,7 +60,7 @@ In order to use the Google Compute Engine ( *GCE* ) provider, you must create a 
 We must create an ssh key to enable ssh access to the VMs that are instantiated by the Elastic Cloud tool. Instructions to do so follow.
 
 1. Create the ssh key
-	1. Use the `ssh-keygen -t rsa` command.
+	1. Use the `ssh-keygen -t rsa -m PEM` command.
 	2. Name the key, `~/.ssh/GCE_rsa`.
 2. Enable access with the newly-created ssh key.
 	1.  Open the Google Cloud Console.
