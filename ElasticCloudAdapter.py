@@ -1,3 +1,4 @@
+import StringIO
 import os
 import paramiko
 import yaml
@@ -56,20 +57,26 @@ class ElasticCloudAdapter:
         self.ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         
         config = paramiko.config.SSHConfig()
-        
-        with open(ssh_config_filename) as f:
-            config.parse(f)
 
         try:
+            with open(ssh_config_filename) as f:
+                config.parse(f)
+
             elastic_cloud_ssh_config = 'ElasticCloud'
             user_config = config.lookup(elastic_cloud_ssh_config)
             pkey_fn = user_config['identityfile'][0]
             self.username = user_config['user']
             self.pkey = paramiko.RSAKey.from_private_key_file(pkey_fn)#, password="placeholder")
-        except KeyError:
+        except (FileNotFoundError, KeyError):
             # We don't have a specific entry for this, use defaults
             self.username = "ubuntu"
-            self.pkey = paramiko.RSAKey.from_private_key_file(os.path.expanduser("~/.ssh/id_rsa"))
+
+            ssh_key = os.environ.get("GCE_SSH_PRIV")
+            if ssh_key:
+                self.pkey = paramiko.RSAKey.from_private_key(StringIO.StringIO(ssh_key))
+            else:
+                # try to use default local one
+                self.pkey = paramiko.RSAKey.from_private_key_file(os.path.expanduser("~/.ssh/id_rsa"))
 
     def _connect(self, host):
         # Delete old known hosts entry for GCE VM ip address

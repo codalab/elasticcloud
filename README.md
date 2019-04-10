@@ -7,6 +7,9 @@ EC will automatically spin-up and spin-down VM instances according to the parame
 Env vars:
 
 ```
+# SSH Keys to connect to workers with
+GCE_SSH_PUB
+GCE_SSH_PRIV
 # Broker to connect to
 BROKER_URL
 # max count of VMs  
