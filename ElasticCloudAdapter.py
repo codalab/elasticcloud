@@ -49,7 +49,7 @@ class ElasticCloudAdapter:
                 }
             }
 
-        print(service_config['datacenter'])
+        print(service_config['services']['gce']['datacenter'])
         self.config = service_config['services'][service_name]
     
     def _load_ssh_configuration(self):
