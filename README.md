@@ -2,8 +2,27 @@
 
 EC will automatically spin-up and spin-down VM instances according to the parameters set by you.
 
-## Setup Instructions
+## Heroku setup
 
+Env vars:
+
+```
+# Broker to connect to
+BROKER_URL
+# max count of VMs  
+GCE_MAX 
+# min count of VMs
+GCE_MIN
+# How many checks resulting in a node being not-busy before shrink is called
+GCE_SHRINK_SENSITIVITY
+# How many checks resulting in all nodes being busy before expand is called
+GCE_EXPAND_SENSITIVITY
+GCE_IMAGE_NAME
+GCE_USE_GPUS
+GCE_VM_SIZE
+GCE_DATACENTER
+GCE_SERVICE_ACCOUNT_FILE
+```
 
 ### Python Environment
 

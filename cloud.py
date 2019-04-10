@@ -3,6 +3,7 @@ import click
 from ElasticCloudAdapter import ElasticCloudAdapter
 from GCEAdapter import GCEAdapter
 
+
 def adapter_choice(driver):
     if driver == 'gce':
         return GCEAdapter()
@@ -13,7 +14,6 @@ def adapter_choice(driver):
 @click.group()
 def cli():
     pass
-
 
 
 @cli.command()
@@ -42,6 +42,7 @@ def auto_scale(driver):
             click.echo('Expanding...')
             click.echo(adapter.expand())
 
+
 @cli.command()
 @click.argument('driver', type=click.Choice(['gce']))
 def dump_state(driver):
@@ -62,12 +63,14 @@ def shrink(driver):
     click.echo('Shrinking...')
     click.echo(adapter.shrink())
 
+
 @cli.command()
 @click.argument('driver', type=click.Choice(['gce']))
 def expand(driver):
     adapter = adapter_choice(driver)
     click.echo('Expanding...')
     click.echo(adapter.expand())
-    
+
+
 if __name__ == '__main__':
     cli()

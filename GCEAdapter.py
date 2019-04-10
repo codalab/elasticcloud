@@ -76,7 +76,6 @@ class GCEAdapter(ElasticCloudAdapter):
             nodes.remove(n)
 
         return nodes
-        
 
     def _get_oldest_node(self):
         # use strptime to parse node names and compare

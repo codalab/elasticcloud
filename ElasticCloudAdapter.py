@@ -23,8 +23,27 @@ class ElasticCloudAdapter:
         service_config = None
         config_filename = 'cloud_config/config.yaml'
 
-        with open(config_filename) as f:
-            service_config = yaml.load(f, Loader=yaml.FullLoader)
+        # Load config from yaml OR from environment
+        if os.path.exists(config_filename):
+            with open(config_filename) as f:
+                service_config = yaml.load(f, Loader=yaml.FullLoader)
+        else:
+            service_config = {
+                'BROKER_URL': os.environ.get("BROKER_URL"),
+                'services': {
+                    'gce': {
+                        'max': os.environ.get('GCE_MAX'),
+                        'min': os.environ.get('GCE_MIN'),
+                        'shrink_sensitivity': os.environ.get('GCE_SHRINK_SENSITIVITY', 3),
+                        'expand_sensitivity': os.environ.get('GCE_EXPAND_SENSITIVITY', 1),
+                        'image_name': os.environ.get('GCE_IMAGE_NAME'),
+                        'use_gpus': os.environ.get('GCE_USE_GPUS'),
+                        'vm_size': os.environ.get('GCE_VM_SIZE'),
+                        'datacenter': os.environ.get('GCE_DATACENTER'),
+                        'service_account_file': os.environ.get('GCE_SERVICE_ACCOUNT_FILE'),
+                    }
+                }
+            }
 
         self.config = service_config['services'][service_name]
     
