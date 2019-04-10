@@ -264,6 +264,34 @@ class GCEAdapter(ElasticCloudAdapter):
             new_node = self.gce.create_node(**new_node_arguments)
 
             self.gce.wait_until_running([new_node])
+            
+            # SSH startup script
+            startup_command = """nvidia-docker run \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v /var/lib/nvidia-docker/nvidia-docker.sock:/var/lib/nvidia-docker/nvidia-docker.sock \
+    -v /tmp/codalab:/tmp/codalab \
+    -d \
+    --name compute_worker \
+    --env-file .env \
+    --restart unless-stopped \
+    --log-opt max-size=50m \
+    --log-opt max-file=3 \
+    codalab/competitions-v1-nvidia-worker:latest"""
+    
+    
+            try:
+                self._connect(new_node.public_ips[0])
+            except (ssh_exception.NoValidConnectionsError, ssh_exception.AuthenticationException):
+                print("ERROR :: Could not connect to host, maybe it is spinning down?")
+
+            stdin, stdout, stderr = self.ssh_client.exec_command(startup_command)
+
+            print('Standard Out:')
+            for line in stdout.readlines():
+                print(line)
+            print('Standard Error:')
+            for line in stdout.readlines():
+                print(line)
 
             # Mark container state as "STARTING"
             self._set_container_state(node_name, GCEAdapter.CONTAINER_STARTING)
