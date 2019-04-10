@@ -1,7 +1,11 @@
+import json
 import os
+import time
+
 from datetime import datetime
 from paramiko import ssh_exception
-import time
+from libcloud.compute.types import Provider
+from libcloud.compute.providers import get_driver
 
 from ElasticCloudAdapter import ElasticCloudAdapter
 
@@ -32,6 +36,8 @@ class GCEAdapter(ElasticCloudAdapter):
     def _configure(self):
         # From config.yaml
         self.service_account_key = self.config['service_account_key']
+        # If above key is given, this path points to a temp storage version of the above key -- it
+        # will be overwritten!
         self.service_account_key_path = self.config['service_account_file']
         self.datacenter = self.config['datacenter']
         self.image = self.config['image_name']
@@ -43,16 +49,15 @@ class GCEAdapter(ElasticCloudAdapter):
         self.use_gpus = self.config.get("use_gpus", False)
 
     def _load_gce_account(self):
-        tmp = __import__('libcloud.compute.types', fromlist=['Provider'])
-        Provider = tmp.Provider
-        tmp = __import__('libcloud.compute.providers', fromlist=['get_driver'])
-        get_driver = tmp.get_driver
-        json = __import__('json')
         service_account = None
 
         if self.service_account_key:
             print("Loading service account key directly, not reading from file path")
             service_account = json.loads(self.service_account_key)
+            self.service_account_key_path = "gce_service_key_temp_store.json"
+            with open(self.service_account_key_path, "w") as f:
+                json.dump(f, service_account)
+
         else:
             print(f"Reading from service account key path: {self.service_account_key_path}")
             with open(self.service_account_key_path) as f:
