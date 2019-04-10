@@ -1,4 +1,3 @@
-import StringIO
 import os
 import paramiko
 import yaml
@@ -73,7 +72,7 @@ class ElasticCloudAdapter:
 
             ssh_key = os.environ.get("GCE_SSH_PRIV")
             if ssh_key:
-                self.pkey = paramiko.RSAKey.from_private_key(StringIO.StringIO(ssh_key))
+                self.pkey = paramiko.RSAKey.from_private_key(ssh_key)
             else:
                 # try to use default local one
                 self.pkey = paramiko.RSAKey.from_private_key_file(os.path.expanduser("~/.ssh/id_rsa"))
