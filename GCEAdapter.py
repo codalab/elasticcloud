@@ -52,7 +52,7 @@ class GCEAdapter(ElasticCloudAdapter):
 
         if self.service_account_key:
             print("Loading service account key directly, not reading from file path")
-            service_account = json.load(self.service_account_key)
+            service_account = json.loads(self.service_account_key)
         else:
             print(f"Reading from service account key path: {self.service_account_key_path}")
             with open(self.service_account_key_path) as f:
