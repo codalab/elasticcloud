@@ -93,6 +93,7 @@ class ElasticCloudAdapter:
                     line_ip = line.split()[0]
                     if not line_ip == host:
                         f.write(line)
+        print(self.pkey)
         self.ssh_client.connect(host, username=self.username, pkey=self.pkey)
 
     def _run_ssh_command(self, host, command):
