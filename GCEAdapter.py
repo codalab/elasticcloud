@@ -255,10 +255,11 @@ class GCEAdapter(ElasticCloudAdapter):
                 "ex_service_accounts": [{'email': self.service_account_email, 'scopes': ['compute']}]
             }
             if self.use_gpus:
-                print("(note, we doing GPU stuff hoss)")
                 new_node_arguments["ex_on_host_maintenance"] = "TERMINATE"
                 new_node_arguments["ex_accelerator_count"] = 1
                 new_node_arguments["ex_accelerator_type"] = "nvidia-tesla-p100"
+
+            print(f"New node arguments:\n{new_node_arguments}")
 
             new_node = self.gce.create_node(**new_node_arguments)
 
