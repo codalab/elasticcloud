@@ -1,7 +1,11 @@
+import json
 import os
+import time
+
 from datetime import datetime
 from paramiko import ssh_exception
-import time
+from libcloud.compute.types import Provider
+from libcloud.compute.providers import get_driver
 
 from ElasticCloudAdapter import ElasticCloudAdapter
 
@@ -31,6 +35,9 @@ class GCEAdapter(ElasticCloudAdapter):
 
     def _configure(self):
         # From config.yaml
+        self.service_account_key = self.config['service_account_key']
+        # If above key is given, this path points to a temp storage version of the above key -- it
+        # will be overwritten!
         self.service_account_key_path = self.config['service_account_file']
         self.datacenter = self.config['datacenter']
         self.image = self.config['image_name']
@@ -42,24 +49,30 @@ class GCEAdapter(ElasticCloudAdapter):
         self.use_gpus = self.config.get("use_gpus", False)
 
     def _load_gce_account(self):
-        tmp = __import__('libcloud.compute.types', fromlist=['Provider'])
-        Provider = tmp.Provider
-        tmp = __import__('libcloud.compute.providers', fromlist=['get_driver'])
-        get_driver = tmp.get_driver
-        json = __import__('json')
         service_account = None
 
-        with open(self.service_account_key_path) as f:
-            service_account = json.load(f)
+        if self.service_account_key:
+            print("Loading service account key directly, not reading from file path")
+            service_account = json.loads(self.service_account_key)
+            self.service_account_key_path = "gce_service_key_temp_store.json"
+            with open(self.service_account_key_path, "w") as f:
+                f.write(self.service_account_key)
+
+        else:
+            print(f"Reading from service account key path: {self.service_account_key_path}")
+            with open(self.service_account_key_path) as f:
+                service_account = json.load(f)
 
         Driver = get_driver(Provider.GCE)
         self.service_account_email = service_account['client_email']
 
-        return Driver(service_account['client_email'],
-                      self.service_account_key_path,
-                      datacenter=self.datacenter,
-                      project=service_account['project_id'])
-   
+        return Driver(
+            service_account['client_email'],
+            self.service_account_key_path,
+            datacenter=self.datacenter,
+            project=service_account['project_id']
+        )
+
     def list_nodes(self):
         nodes = self.gce.list_nodes()
         # Filter nodes that don't fit the datetime format. These nodes were probably created by the user and not by elastic cloud.
@@ -76,7 +89,6 @@ class GCEAdapter(ElasticCloudAdapter):
             nodes.remove(n)
 
         return nodes
-        
 
     def _get_oldest_node(self):
         # use strptime to parse node names and compare
@@ -240,17 +252,47 @@ class GCEAdapter(ElasticCloudAdapter):
                 "name": node_name,
                 "size": self.size,
                 "image": self.image,
+                "location": self.datacenter,
                 "ex_service_accounts": [{'email': self.service_account_email, 'scopes': ['compute']}]
             }
             if self.use_gpus:
-                print("(note, we doing GPU stuff hoss)")
                 new_node_arguments["ex_on_host_maintenance"] = "TERMINATE"
                 new_node_arguments["ex_accelerator_count"] = 1
                 new_node_arguments["ex_accelerator_type"] = "nvidia-tesla-p100"
 
+            print(f"New node arguments:\n{new_node_arguments}")
+
             new_node = self.gce.create_node(**new_node_arguments)
 
             self.gce.wait_until_running([new_node])
+            
+            # SSH startup script
+            startup_command = """nvidia-docker run \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v /var/lib/nvidia-docker/nvidia-docker.sock:/var/lib/nvidia-docker/nvidia-docker.sock \
+    -v /tmp/codalab:/tmp/codalab \
+    -d \
+    --name compute_worker \
+    --env-file .env \
+    --restart unless-stopped \
+    --log-opt max-size=50m \
+    --log-opt max-file=3 \
+    codalab/competitions-v1-nvidia-worker:latest"""
+    
+    
+            try:
+                self._connect(new_node.public_ips[0])
+            except (ssh_exception.NoValidConnectionsError, ssh_exception.AuthenticationException):
+                print("ERROR :: Could not connect to host, maybe it is spinning down?")
+
+            #stdin, stdout, stderr = self.ssh_client.exec_command(startup_command)
+
+#            print('Standard Out:')
+#            for line in stdout.readlines():
+#                print(line)
+#            print('Standard Error:')
+#            for line in stdout.readlines():
+#                print(line)
 
             # Mark container state as "STARTING"
             self._set_container_state(node_name, GCEAdapter.CONTAINER_STARTING)

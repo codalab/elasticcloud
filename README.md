@@ -2,8 +2,33 @@
 
 EC will automatically spin-up and spin-down VM instances according to the parameters set by you.
 
-## Setup Instructions
+## Heroku setup
 
+Env vars:
+
+```
+# SSH Keys to connect to workers with
+GCE_SSH_PUB
+GCE_SSH_PRIV
+# Broker to connect to
+BROKER_URL
+# max count of VMs  
+GCE_MAX 
+# min count of VMs
+GCE_MIN
+# How many checks resulting in a node being not-busy before shrink is called
+GCE_SHRINK_SENSITIVITY
+# How many checks resulting in all nodes being busy before expand is called
+GCE_EXPAND_SENSITIVITY
+GCE_IMAGE_NAME
+GCE_USE_GPUS
+GCE_VM_SIZE
+GCE_DATACENTER
+# Actual JSON data in place of the file, this takes priority
+GCE_SERVICE_ACCOUNT_KEY
+# File path for GCE account json data
+GCE_SERVICE_ACCOUNT_FILE
+```
 
 ### Python Environment
 
@@ -35,7 +60,7 @@ In order to use the Google Compute Engine ( *GCE* ) provider, you must create a 
 We must create an ssh key to enable ssh access to the VMs that are instantiated by the Elastic Cloud tool. Instructions to do so follow.
 
 1. Create the ssh key
-	1. Use the `ssh-keygen -t rsa` command.
+	1. Use the `ssh-keygen -t rsa -m PEM` command.
 	2. Name the key, `~/.ssh/GCE_rsa`.
 2. Enable access with the newly-created ssh key.
 	1.  Open the Google Cloud Console.
