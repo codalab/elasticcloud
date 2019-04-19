@@ -1,6 +1,11 @@
 import os
+import json
+import copy
 from datetime import datetime
 from paramiko import ssh_exception
+import boto3
+from botocore.exceptions import ClientError
+
 import time
 
 from ElasticCloudAdapter import ElasticCloudAdapter
@@ -12,6 +17,7 @@ class GCEAdapter(ElasticCloudAdapter):
     CONTAINER_RUNNING = 'RUNNING'
     CONTAINER_STOPPING = 'STOPPING'
     CONTAINER_STOPPED = 'STOPPED'
+    INITIALIZING = True
 
     def __init__(self):
         super().__init__('gce')
@@ -21,13 +27,18 @@ class GCEAdapter(ElasticCloudAdapter):
 
         # Used to format node names (datetime formatting)
         self.format = '%m-%d-%Y-%H-%M-%S'
+        
+        self._load_boto_client()
 
+        # TODO: STATEUPDATE
         states_directory = '.states'
         self.container_states_filename = states_directory + '/container_states'
         self.node_states_filename = states_directory + '/node_states'
 
         if not os.path.isdir(states_directory):
             os.mkdir(states_directory)
+
+        GCEAdapter.INITIALIZING = False
 
     def _configure(self):
         # From config.yaml
@@ -59,7 +70,48 @@ class GCEAdapter(ElasticCloudAdapter):
                       self.service_account_key_path,
                       datacenter=self.datacenter,
                       project=service_account['project_id'])
-   
+
+    def _load_boto_client(self):
+        # Load env vars
+        CLOUDCUBE_URL = os.environ['CLOUDCUBE_URL']
+        CLOUDCUBE_ACCESS_KEY_ID = os.environ['CLOUDCUBE_ACCESS_KEY_ID']
+        CLOUDCUBE_SECRET_ACCESS_KEY = os.environ['CLOUDCUBE_SECRET_ACCESS_KEY']
+        self.s3_client = boto3.client('s3', aws_access_key_id=CLOUDCUBE_ACCESS_KEY_ID, aws_secret_access_key=CLOUDCUBE_SECRET_ACCESS_KEY)
+        self.s3_bucket_name = 'cloud-cube'
+        fs_prefix = CLOUDCUBE_URL[-12:]
+        remote_location = '/gce_states'
+        self.s3_state_file_location = fs_prefix + remote_location
+        self.local_state_file_location = '.gce_states'
+        
+        try:
+            self.s3_client.download_file(self.s3_bucket_name, self.s3_state_file_location, self.local_state_file_location)
+        except ClientError:
+            print('ClientError')
+            if os.path.exists(self.local_state_file_location) and os.path.getsize(self.local_state_file_location) > 0:
+                self.s3_client.upload_file(self.local_state_file_location, self.s3_bucket_name, self.s3_state_file_location)
+            else:
+                print('local states did not exist')
+                new_states = {}
+                with open(self.local_state_file_location,'w+') as state_file:
+                    node_states = self.dump_state()
+                    print(node_states)
+                    new_states['node'] = node_states
+
+                    container_states = {}
+                    for name in node_states:
+                        container_states[name] = {}
+                        container_states[name]['status'] = self.CONTAINER_RUNNING
+
+                    new_states['container'] = container_states
+                    json.dump(new_states, state_file)
+                    
+                print(new_states)
+                self.s3_client.upload_file(self.local_state_file_location, self.s3_bucket_name, self.s3_state_file_location)
+                
+            
+        
+
+
     def list_nodes(self):
         nodes = self.gce.list_nodes()
         # Filter nodes that don't fit the datetime format. These nodes were probably created by the user and not by elastic cloud.
@@ -91,61 +143,50 @@ class GCEAdapter(ElasticCloudAdapter):
                 oldest_node = node
         return oldest_node
 
-    def _load_states(self, option):
-        if option == 'container':
-            filename = self.container_states_filename
-        elif option == 'node':
-            filename = self.node_states_filename
-        states = []
+    def _load_states(self):
+        states = {}
 
-        # Check that file exists
-        if os.path.isfile(filename):
-            with open(filename) as f:
-                lines = f.readlines()
-                for l in lines:
-                    line = l.split()
-                    states.append(line)
+        self.s3_client.download_file(self.s3_bucket_name, self.s3_state_file_location, self.local_state_file_location)
+        with open(self.local_state_file_location, 'r+') as state_file:
+            states = json.load(state_file)
+
         return states
 
-    def _store_states(self, states, option):
-        if option == 'container':
-            filename = self.container_states_filename
-        elif option == 'node':
-            filename = self.node_states_filename
-        with open(filename, 'w+') as f:
-            for s in states:
-                line = " ".join(s)
-                f.write('%s\n' % line)
+    def _store_states(self, new_states, option):
+        states = self._load_states()
+        states[option] = new_states 
+
+        with open(self.local_state_file_location, 'w+') as state_file:
+            json.dump(states, state_file)        
+
+        self.s3_client.upload_file(self.local_state_file_location, self.s3_bucket_name, self.s3_state_file_location)
 
     def _set_container_state(self, node_name, state):
-        states = self._load_states('container')
-        state_exists = False
-        for s in states:
-            if s[0] == node_name:
-                s[1] = state
-                state_exists = True
-        if not state_exists:
-            new_state = [node_name, state]
-            states.append(new_state)
+        states = self._load_states()['container']
+        if states.get(node_name):
+            states[node_name]['status'] = state
+        else:
+            states[node_name] = {}
+            states[node_name]['status'] = state
         self._store_states(states, 'container')
 
     def _get_container_state(self, node_name):
-        filename = "container_states"
-        states = self._load_states('container')
-        for s in states:
-            if s[0] == node_name:
-                return s[1]
-        return None
+        states = self._load_states()['container']
+        state = states.get(node_name)
+        if state:
+            return state['status']
+        else:
+            return None
 
     def _clean_container_states(self):
-        states = self._load_states('container')
-        new_states = []
-        for s in states:
-            if s[1] == self.CONTAINER_STOPPED:
-                pass
-            else:
-                new_states.append(s)
-        self._store_states(new_states, 'container')
+        states = self._load_states()['container']
+
+        stored_states = copy.deepcopy(states)
+        for node_name in states:
+            if states[node_name]['status'] == self.CONTAINER_STOPPED:
+                stored_states.pop(node_name, None)
+
+        self._store_states(stored_states, 'container')
 
     def _update_container_state(self, node_name):
         print("node_name:", node_name) # DEBUG
@@ -164,17 +205,31 @@ class GCEAdapter(ElasticCloudAdapter):
         out = stdout.readlines()
         container_running = len(out) - 1
 
-        print('_update_container_state: container_running:', container_running)
         if container_running:
-            #if self._get_container_state(node_name) == GCEAdapter.CONTAINER_STARTING:
             self._set_container_state(node_name, GCEAdapter.CONTAINER_RUNNING)
         else:
             print(node_name + ' container not currently running.')
     
-    def update_all_container_states(self):
+    def update_all_states(self):
         node_names = self.get_node_names()
+
+        old_node_states = self._load_states()['node']
+        new_node_states = self.dump_state()
+
+        node_states = {}
+        for name in new_node_states:
+            node = old_node_states.get(name)
+            if node:
+                node_states[name] = node
+            else:
+                node_states[name] = {}
+                node_states[name]['status'] = new_node_states[name]['status']
+                node_states[name]['count'] = 1
+        self._store_states(node_states, 'node')
+
         for name in node_names:
             self._update_container_state(name)
+
 
     def _wait_for_node_container_shutdown(self, node_name):
         print("node_name:", node_name) # DEBUG
@@ -193,7 +248,7 @@ class GCEAdapter(ElasticCloudAdapter):
 
             out = stdout.readlines()
             container_running = len(out) - 1
-            print("container_running:", container_running) # DEBUG
+            #print("container_running:", container_running) # DEBUG
             if container_running:
                 print('container stopping.')
             else:
@@ -210,8 +265,8 @@ class GCEAdapter(ElasticCloudAdapter):
         command = 'sudo docker stop -t 10 ' + container_name
 
         (stdin, stdout, stderr) = self._run_ssh_command(ip, command)
-        print(stdout.readlines()) # DEBUG
-        print(stderr.readlines()) # DEBUG
+        #print(stdout.readlines()) # DEBUG
+        #print(stderr.readlines()) # DEBUG
 
     def get_node_quantity(self):
         return len(self.list_nodes())
@@ -287,16 +342,12 @@ class GCEAdapter(ElasticCloudAdapter):
             return "Only " + str(self.min_nodes) + " nodes running. (min)"
 
     def dump_state(self):
-
-        node_states = []
-        node_names = self.get_node_names()
-
-        node_index = 0
+        node_states = {}
+        nodes = self.list_nodes()
 
         # paramiko ssh
-        ips = self.get_node_ips()
-        for ip in ips:
-            host = ip[0]
+        for node in nodes:
+            host = node.public_ips[0]
             try:
                 self._connect(host)
             except (ssh_exception.NoValidConnectionsError, ssh_exception.AuthenticationException):
@@ -310,19 +361,26 @@ class GCEAdapter(ElasticCloudAdapter):
                 s = stdout.readlines()
                 if command == 'ls -la /tmp/codalab | wc -l':
                     directory_length = int(s[0])
-                    print("GET CONTAINER STATE:", self._get_container_state(node_names[node_index]))
-                    if directory_length > 4:
-                        node_states.append('BUSY')
-                    elif self._get_container_state(node_names[node_index]) == GCEAdapter.CONTAINER_STARTING:
-                        node_states.append('MANAGED')
+                    node_states[node.name] = { 'status': 'NOT-BUSY',
+                                               'count': 1,
+                                             }
+                    if GCEAdapter.INITIALIZING:
+                        if directory_length > 4:
+                            node_states[node.name]['status'] = 'BUSY'
+                        else:
+                            node_states[node.name]['status'] = 'NOT-BUSY'
                     else:
-                        node_states.append('NOT-BUSY')
+                        if directory_length > 4:
+                            node_states[node.name]['status'] = 'BUSY'
+                        elif self._get_container_state(node.name) == GCEAdapter.CONTAINER_STARTING:
+                            node_states[node.name]['status'] = 'MANAGED'
+                        else:
+                            node_states[node.name]['status'] = 'NOT-BUSY'
                 else:
                     for l in s:
                         print(l)
                     print("stderr", stderr.readlines())
-            node_index += 1
-        return list(zip(node_names, node_states))
+        return node_states
 
     def get_next_action(self):
         """
@@ -336,38 +394,42 @@ class GCEAdapter(ElasticCloudAdapter):
         next_action = ElasticCloudAdapter.ACTION_DO_NOTHING
         action_count = 0
 
-        def get_count(old_nodes, node):
-            for i in range(len(old_nodes)):
-                if old_nodes[i][0] == node[0]:
-                    if node[1] == old_nodes[i][1]:
-                        return int(old_nodes[i][2])
-            return 0
+        
+        # TODO: STATEUPDATE
 
-        filename = "node_states"
-        old_nodes = self._load_states('node')
-
-        stored_nodes = []
         new_nodes = self.dump_state()
+        old_nodes = self._load_states()['node']
         busy_count = 0
         managed_count = 0
-        for n in new_nodes:
-            count = get_count(old_nodes, n)
-            if n[1] == 'NOT-BUSY':
-                if count >= self.SHRINK_CRITERION:
-                    print('shrink criterion met')
-                    next_action = ElasticCloudAdapter.ACTION_SHRINK
-                    action_count += 1
-            elif n[1] == 'BUSY':
-                busy_count += 1
-            elif n[1] == 'MANAGED':
-                managed_count += 1
-            stored_nodes.append([n[0], n[1], str(count + 1)])
+
+        print('get_next_action:')
+        print('new_nodes:',new_nodes)
+        print('old_nodes:',old_nodes)
+
+        for name in new_nodes:
+            old_count = old_nodes[name]['count']
+            old_state = old_nodes[name]['status']
+            new_state = new_nodes[name]['status']
+
+            if old_state == new_state:
+                if new_nodes[name]['status'] == 'NOT-BUSY':
+                    if old_count >= self.SHRINK_CRITERION:
+                        next_action = ElasticCloudAdapter.ACTION_SHRINK
+                        action_count += 1
+                elif new_nodes[name]['status'] == 'BUSY':
+                    busy_count += 1
+                elif new_nodes[name]['status'] == 'MANAGED':
+                    managed_count += 1
+                old_nodes[name]['count'] += 1
+            else:
+                old_nodes[name]['count'] = 1
+                old_nodes[name]['status'] = new_state
 
         # all nodes are in busy state
-        if busy_count == len(new_nodes) - managed_count:
+        if busy_count == len(new_nodes):
             TOO_BUSY = True
-            for n in old_nodes:
-                if int(n[2]) < self.EXPAND_CRITERION:
+            for name in old_nodes:
+                if old_nodes[name]['count'] < self.EXPAND_CRITERION:
                     TOO_BUSY = False
 
             if TOO_BUSY:
@@ -375,6 +437,6 @@ class GCEAdapter(ElasticCloudAdapter):
                 next_action = ElasticCloudAdapter.ACTION_EXPAND
                 action_count = 1
 
-        self._store_states(stored_nodes, 'node')
+        self._store_states(old_nodes, 'node')
         self._clean_container_states()
         return (next_action, action_count)

@@ -1,5 +1,6 @@
 import os
 import paramiko
+from paramiko import ssh_exception
 import yaml
 
 
@@ -64,7 +65,10 @@ class ElasticCloudAdapter:
                     line_ip = line.split()[0]
                     if not line_ip == host:
                         f.write(line)
-        self.ssh_client.connect(host, username=self.username, pkey=self.pkey)
+        try:
+            self.ssh_client.connect(host, username=self.username, pkey=self.pkey)
+        except (ssh_exception.NoValidConnectionsError, ssh_exception.AuthenticationException):
+            print("ERROR :: Could not connect to host, maybe it is spinning down?")
 
     def _run_ssh_command(self, host, command):
         self._connect(host)

@@ -21,12 +21,12 @@ def cli():
 def auto_scale(driver):
     adapter = adapter_choice(driver)
 
-    adapter.update_all_container_states()
+    adapter.update_all_states()
     states = adapter.dump_state()
     output_format = '{0: <30} {1}'
     click.echo(output_format.format('Name', 'State'))
-    for state in states:
-        click.echo(output_format.format(state[0], state[1]))
+    for name in states:
+        click.echo(output_format.format(name, states[name]['status']))
     
     next_action, action_count = adapter.get_next_action()
     
@@ -47,12 +47,12 @@ def auto_scale(driver):
 def dump_state(driver):
     adapter = adapter_choice(driver)
 
-    adapter.update_all_container_states()
+    adapter.update_all_states()
     states = adapter.dump_state()
     output_format = '{0: <30} {1}'
     click.echo(output_format.format('Name', 'State'))
-    for state in states:
-        click.echo(output_format.format(state[0], state[1]))
+    for name in states:
+        click.echo(output_format.format(name, states[name]['status']))
 
 
 @cli.command()
