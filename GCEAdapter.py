@@ -1,12 +1,13 @@
 import os
 import json
 import copy
+import time
 from datetime import datetime
+
 from paramiko import ssh_exception
 import boto3
 from botocore.exceptions import ClientError
-
-import time
+from libcloud.common.google import GoogleBaseError
 
 from ElasticCloudAdapter import ElasticCloudAdapter
 
@@ -30,15 +31,8 @@ class GCEAdapter(ElasticCloudAdapter):
         
         self._load_boto_client()
 
-        # TODO: STATEUPDATE
-        states_directory = '.states'
-        self.container_states_filename = states_directory + '/container_states'
-        self.node_states_filename = states_directory + '/node_states'
-
-        if not os.path.isdir(states_directory):
-            os.mkdir(states_directory)
-
         GCEAdapter.INITIALIZING = False
+
 
     def _configure(self):
         # From config.yaml
@@ -51,6 +45,9 @@ class GCEAdapter(ElasticCloudAdapter):
         self.EXPAND_CRITERION = self.config['expand_sensitivity']
         self.SHRINK_CRITERION = self.config['shrink_sensitivity']
         self.use_gpus = self.config.get("use_gpus", False)
+        self.CLOUDCUBE_URL = os.environ['CLOUDCUBE_URL']
+        self.CLOUDCUBE_ACCESS_KEY_ID = os.environ['CLOUDCUBE_ACCESS_KEY_ID']
+        self.CLOUDCUBE_SECRET_ACCESS_KEY = os.environ['CLOUDCUBE_SECRET_ACCESS_KEY']
 
     def _load_gce_account(self):
         tmp = __import__('libcloud.compute.types', fromlist=['Provider'])
@@ -66,19 +63,16 @@ class GCEAdapter(ElasticCloudAdapter):
         Driver = get_driver(Provider.GCE)
         self.service_account_email = service_account['client_email']
 
+
         return Driver(service_account['client_email'],
                       self.service_account_key_path,
                       datacenter=self.datacenter,
                       project=service_account['project_id'])
 
     def _load_boto_client(self):
-        # Load env vars
-        CLOUDCUBE_URL = os.environ['CLOUDCUBE_URL']
-        CLOUDCUBE_ACCESS_KEY_ID = os.environ['CLOUDCUBE_ACCESS_KEY_ID']
-        CLOUDCUBE_SECRET_ACCESS_KEY = os.environ['CLOUDCUBE_SECRET_ACCESS_KEY']
-        self.s3_client = boto3.client('s3', aws_access_key_id=CLOUDCUBE_ACCESS_KEY_ID, aws_secret_access_key=CLOUDCUBE_SECRET_ACCESS_KEY)
+        self.s3_client = boto3.client('s3', aws_access_key_id=self.CLOUDCUBE_ACCESS_KEY_ID, aws_secret_access_key=self.CLOUDCUBE_SECRET_ACCESS_KEY)
         self.s3_bucket_name = 'cloud-cube'
-        fs_prefix = CLOUDCUBE_URL[-12:]
+        fs_prefix = self.CLOUDCUBE_URL[-12:]
         remote_location = '/gce_states'
         self.s3_state_file_location = fs_prefix + remote_location
         self.local_state_file_location = '.gce_states'
@@ -120,7 +114,7 @@ class GCEAdapter(ElasticCloudAdapter):
 
         for n in nodes:
             try:
-                datetime.strptime(n.name[4:], self.format)
+                datetime.strptime(n.name[4:-4], self.format)
             except ValueError:
                 unfit_nodes.append(n)
 
@@ -130,18 +124,19 @@ class GCEAdapter(ElasticCloudAdapter):
         return nodes
         
 
-    def _get_oldest_node(self):
+    def _get_oldest_nodes(self,n):
         # use strptime to parse node names and compare
+        def calculate_key(node):
+            date = datetime.strptime(node.name[4:-4], self.format)
+            return date
+
         nodes = self.list_nodes()
+        if n > len(nodes):
+            n = len(nodes)
 
-
-        oldest_date = datetime.strptime(nodes[0].name[4:], self.format)
-        oldest_node = nodes[0]
-        for node in nodes:
-            date = datetime.strptime(node.name[4:], self.format)
-            if date < oldest_date:
-                oldest_node = node
-        return oldest_node
+        nodes.sort(key=calculate_key)
+        
+        return nodes[0:n]
 
     def _load_states(self):
         states = {}
@@ -189,8 +184,6 @@ class GCEAdapter(ElasticCloudAdapter):
         self._store_states(stored_states, 'container')
 
     def _update_container_state(self, node_name):
-        print("node_name:", node_name) # DEBUG
-
         # get ip from node name
         node = None
         for n in self.list_nodes():
@@ -285,61 +278,79 @@ class GCEAdapter(ElasticCloudAdapter):
             ips.append(n.public_ips)
         return ips
 
-    def expand(self):
-        if self.get_node_quantity() < self.max_nodes:
-            now = datetime.now()
-            node_name = 'gpu-' + now.strftime(self.format)
-            print('Creating new VM node...')
+    def expand(self, quantity):
+        current_quantity = self.get_node_quantity()
+        if current_quantity + quantity > self.max_nodes:
+            if current_quantity >= self.max_node:
+                print("Already " + str(self.get_node_quantity()) + " nodes running. (max)")
+            else: 
+                quantity = self.max_nodes - current_quantity
+                print("Already " + str(current_quantity) + " nodes running. (max)")
+                print("Only " + str(quantity) + " nodes will start up.")
 
-            new_node_arguments = {
-                "name": node_name,
-                "size": self.size,
-                "image": self.image,
-                "ex_service_accounts": [{'email': self.service_account_email, 'scopes': ['compute']}]
-            }
-            if self.use_gpus:
-                print("(note, we doing GPU stuff hoss)")
-                new_node_arguments["ex_on_host_maintenance"] = "TERMINATE"
-                new_node_arguments["ex_accelerator_count"] = 1
-                new_node_arguments["ex_accelerator_type"] = "nvidia-tesla-p100"
+        now = datetime.now()
+        base_name = 'gpu-' + now.strftime(self.format)# + "-{:02d}".format(index)
+        print('Creating new VM node...')
 
-            new_node = self.gce.create_node(**new_node_arguments)
+        new_node_arguments = {
+            "base_name": base_name,
+            "size": self.size,
+            "image": self.image,
+            "number": quantity,
+            "ignore_errors": False,
+            "ex_service_accounts": [{'email': self.service_account_email, 'scopes': ['compute']}]
+        }
 
-            self.gce.wait_until_running([new_node])
+        if self.use_gpus:
+            print("(note, we doing GPU stuff hoss)")
+            new_node_arguments["ex_on_host_maintenance"] = "TERMINATE"
+            new_node_arguments["ex_accelerator_count"] = 1
+            new_node_arguments["ex_accelerator_type"] = "nvidia-tesla-p100"
 
-            # Mark container state as "STARTING"
-            self._set_container_state(node_name, GCEAdapter.CONTAINER_STARTING)
 
-            return "New node running at " + new_node.public_ips[0] + " with name " + node_name
-        else:
-            return "Already " + str(self.get_node_quantity()) + " nodes running. (max)"
+        new_nodes = None
 
-    def shrink(self):
-        if self.get_node_quantity() > self.min_nodes:
-            node_name = self._get_oldest_node().name
+        try:
+            new_nodes = self.gce.ex_create_multiple_nodes(**new_node_arguments)
+    
+        except GoogleBaseError as e:
+            print('GCE Error:', e)
 
-            # Mark state to "STOPPING"
-            self._set_container_state(node_name, GCEAdapter.CONTAINER_STOPPING)
+        if new_nodes:
+            for node in new_nodes:
+                print("New node running at " + node.public_ips[0] + " with name " + node.name)
+                # Mark container state as "STARTING"
+                self._set_container_state(node.name, GCEAdapter.CONTAINER_STARTING)
 
-            # Send SIGTERM to worker (docker stop)
-            self._stop_container(node_name, 'compute_worker')
-            self._wait_for_node_container_shutdown(node_name)
 
-            # Destroy VM
-            node = None
-            for n in self.list_nodes():
-                if n.name == node_name:
-                    node = n
-            print('Shutting down VM...')
-            self.gce.destroy_node(node)
-            print('VM has shut down.')
-
-            # Mark state to "STOPPED"
-            self._set_container_state(node_name, GCEAdapter.CONTAINER_STOPPED)
-
-            return "Destroyed node: " + node.name + "."
+    def shrink(self, quantity):
+        current_quantity = self.get_node_quantity()
+        if current_quantity > self.min_nodes:
+            if current_quantity - quantity < self.min_nodes:
+                quantity = current_quantity - self.min_nodes
+                print('Spinning down {} nodes.'.format(quantity))
         else:
             return "Only " + str(self.min_nodes) + " nodes running. (min)"
+            
+            # get n oldest nodes
+        nodes = self._get_oldest_nodes(quantity)
+
+        for node in nodes:
+            # Mark state to "STOPPING"
+            self._set_container_state(node.name, GCEAdapter.CONTAINER_STOPPING)
+
+            # Send SIGTERM to worker (docker stop)
+            self._stop_container(node.name, 'compute_worker')
+
+
+        print('Shutting down {} VMs...'.format(quantity))
+        self.gce.ex_destroy_multiple_nodes(nodes)
+        print('VMs have shut down.')
+
+        for node in nodes:
+            # Mark state to "STOPPED"
+            self._set_container_state(node.name, GCEAdapter.CONTAINER_STOPPED)
+
 
     def dump_state(self):
         node_states = {}
@@ -395,7 +406,6 @@ class GCEAdapter(ElasticCloudAdapter):
         action_count = 0
 
         
-        # TODO: STATEUPDATE
 
         new_nodes = self.dump_state()
         old_nodes = self._load_states()['node']

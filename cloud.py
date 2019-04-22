@@ -33,14 +33,13 @@ def auto_scale(driver):
     if next_action == ElasticCloudAdapter.ACTION_DO_NOTHING:
         click.echo('Service is in equilibrium. No need to shrink or expand right now!')
 
-    for i in range(action_count):
-        if next_action == ElasticCloudAdapter.ACTION_SHRINK:
-            click.echo('Shrinking...')
-            click.echo(adapter.shrink())
+    if next_action == ElasticCloudAdapter.ACTION_SHRINK:
+        click.echo('Shrinking...')
+        click.echo(adapter.shrink(action_count))
             
-        if next_action == ElasticCloudAdapter.ACTION_EXPAND:
-            click.echo('Expanding...')
-            click.echo(adapter.expand())
+    if next_action == ElasticCloudAdapter.ACTION_EXPAND:
+        click.echo('Expanding...')
+        click.echo(adapter.expand(action_count))
 
 @cli.command()
 @click.argument('driver', type=click.Choice(['gce']))
@@ -56,18 +55,20 @@ def dump_state(driver):
 
 
 @cli.command()
+@click.option('--n', default=1)
 @click.argument('driver', type=click.Choice(['gce']))
-def shrink(driver):
+def shrink(n, driver):
     adapter = adapter_choice(driver)
-    click.echo('Shrinking...')
-    click.echo(adapter.shrink())
+    click.echo('Shrinking {} nodes...'.format(n))
+    click.echo(adapter.shrink(n))
 
 @cli.command()
+@click.option('--n', default=1)
 @click.argument('driver', type=click.Choice(['gce']))
-def expand(driver):
+def expand(n, driver):
     adapter = adapter_choice(driver)
-    click.echo('Expanding...')
-    click.echo(adapter.expand())
+    click.echo('Expanding {} nodes...'.format(n))
+    click.echo(adapter.expand(n))
     
 if __name__ == '__main__':
     cli()
