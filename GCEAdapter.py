@@ -36,6 +36,9 @@ class GCEAdapter(ElasticCloudAdapter):
 
     def _configure(self):
         # From config.yaml
+        self.service_account_key = self.config['service_account_key']
+        # If above key is given, this path points to a temp storage version of the above key -- it
+        # will be overwritten!
         self.service_account_key_path = self.config['service_account_file']
         self.datacenter = self.config['datacenter']
         self.image = self.config['image_name']
