@@ -12,9 +12,11 @@ import warnings
 warnings.filterwarnings(action='ignore', module='.*paramiko.*')
 
 
-import logging
-logging.basicConfig()
-logging.getLogger("paramiko").setLevel(logging.DEBUG)
+# Uncomment to enable paramiko logging
+# import logging
+# logging.basicConfig()
+# logging.getLogger("paramiko").setLevel(logging.DEBUG)
+
 
 class ElasticCloudAdapter:
 
