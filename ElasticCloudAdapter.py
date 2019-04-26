@@ -76,7 +76,6 @@ class ElasticCloudAdapter:
             self.username = "ubuntu"
 
             ssh_key = os.environ.get("GCE_SSH_PRIV")
-            print(ssh_key)
             if ssh_key:
                 self.pkey = paramiko.RSAKey.from_private_key(io.StringIO(ssh_key))
             else:
