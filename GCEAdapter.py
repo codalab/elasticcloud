@@ -57,8 +57,17 @@ class GCEAdapter(ElasticCloudAdapter):
         json = __import__('json')
         service_account = None
 
-        with open(self.service_account_key_path) as f:
-            service_account = json.load(f)
+        if self.service_account_key:
+            print("Loading service account key directly, not reading from file path")
+            service_account = json.loads(self.service_account_key)
+            self.service_account_key_path = "gce_service_key_temp_store.json"
+            with open(self.service_account_key_path, "w") as f:
+                f.write(self.service_account_key)
+
+        else:
+            print(f"Reading from service account key path: {self.service_account_key_path}")
+            with open(self.service_account_key_path) as f:
+                service_account = json.load(f)
 
         Driver = get_driver(Provider.GCE)
         self.service_account_email = service_account['client_email']
