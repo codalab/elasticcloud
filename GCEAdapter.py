@@ -330,12 +330,15 @@ class GCEAdapter(ElasticCloudAdapter):
              
             for i in range(quantity):
                 base_name = 'gpu-' + now.strftime(self.format) + "-{:03d}".format(i)
-                print("New GPU node named {}".format(base_name))
                 new_node_arguments['name'] = base_name
                 try:
-                    new_nodes = self.gce.create_node(**new_node_arguments)
+                    new_node = self.gce.create_node(**new_node_arguments)
                 except GoogleBaseError as e:
                     print('GCE Error:', e)
+            if new_node:
+                print("New GPU node running at " + new_node.public_ips[0] + " with name " + new_node.name)
+                # Mark container state as "STARTING"
+                self._set_container_state(new_node.name, GCEAdapter.CONTAINER_STARTING)
 
         else:
             try:
@@ -344,11 +347,11 @@ class GCEAdapter(ElasticCloudAdapter):
             except GoogleBaseError as e:
                 print('GCE Error:', e)
 
-        if new_nodes:
-            for node in new_nodes:
-                print("New node running at " + node.public_ips[0] + " with name " + node.name)
-                # Mark container state as "STARTING"
-                self._set_container_state(node.name, GCEAdapter.CONTAINER_STARTING)
+            if new_nodes:
+                for node in new_nodes:
+                    print("New node running at " + node.public_ips[0] + " with name " + node.name)
+                    # Mark container state as "STARTING"
+                    self._set_container_state(node.name, GCEAdapter.CONTAINER_STARTING)
 
 
     def shrink(self, quantity):
