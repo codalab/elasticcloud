@@ -12,6 +12,10 @@ import warnings
 warnings.filterwarnings(action='ignore', module='.*paramiko.*')
 
 
+import logging
+logging.basicConfig()
+logging.getLogger("paramiko").setLevel(logging.DEBUG)
+
 class ElasticCloudAdapter:
 
     ACTION_SHRINK = 'shrink'
