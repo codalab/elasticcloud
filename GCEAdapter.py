@@ -316,7 +316,7 @@ class GCEAdapter(ElasticCloudAdapter):
         new_nodes = None
         if self.use_gpus:
             new_node_arguments = {
-                "name": node_name,
+                "name": base_name,
                 "size": self.size,
                 "image": self.image,
                 "location": self.datacenter,
