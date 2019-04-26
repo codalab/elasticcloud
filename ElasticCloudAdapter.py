@@ -101,7 +101,7 @@ class ElasticCloudAdapter:
                         f.write(line)
         try:
             print(f"Attempting to connect to {self.username}@{host}")
-            self.ssh_client.connect(host, username=self.username, pkey=self.pkey)
+            self.ssh_client.connect(host, username=self.username, pkey=self.pkey, timeout=10)
         except (ssh_exception.NoValidConnectionsError, ssh_exception.AuthenticationException):
             print("ERROR :: Could not connect to host, maybe it is spinning up/down?")
 
