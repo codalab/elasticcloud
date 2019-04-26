@@ -96,8 +96,8 @@ class ElasticCloudAdapter:
                     if not line_ip == host:
                         f.write(line)
         try:
-            print(f"Attempting to connect to {self.username}@{host} with key: \n{self.pkey}")
-            self.ssh_client.connect(host, username=self.username, pkey=os.environ.get("GCE_SSH_PRIV"))
+            print(f"Attempting to connect to {self.username}@{host}")
+            self.ssh_client.connect(host, username=self.username, pkey=self.pkey)
         except (ssh_exception.NoValidConnectionsError, ssh_exception.AuthenticationException):
             print("ERROR :: Could not connect to host, maybe it is spinning up/down?")
 
