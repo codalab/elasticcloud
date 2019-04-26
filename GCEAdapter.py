@@ -301,20 +301,36 @@ class GCEAdapter(ElasticCloudAdapter):
             "ex_service_accounts": [{'email': self.service_account_email, 'scopes': ['compute']}]
         }
 
+        new_nodes = None
         if self.use_gpus:
+            new_node_arguments = {
+                "name": node_name,
+                "size": self.size,
+                "image": self.image,
+                "location": self.datacenter,
+                "ex_service_accounts": [{'email': self.service_account_email, 'scopes': ['compute']}]
+            }
+
             print("(note, we doing GPU stuff hoss)")
             new_node_arguments["ex_on_host_maintenance"] = "TERMINATE"
             new_node_arguments["ex_accelerator_count"] = 1
             new_node_arguments["ex_accelerator_type"] = "nvidia-tesla-p100"
 
+            for i in range(quantity):
+                base_name = 'gpu-' + now.strftime(self.format) + "-{:03d}".format(index)
+                print("New GPU node named {}".format(base_name))
+                new_node_arguments['name'] = base_name
+                try:
+                    new_nodes = self.gce.create_node(**new_node_arguments)
+                except GoogleBaseError as e:
+                    print('GCE Error:', e)
 
-        new_nodes = None
-
-        try:
-            new_nodes = self.gce.ex_create_multiple_nodes(**new_node_arguments)
-    
-        except GoogleBaseError as e:
-            print('GCE Error:', e)
+        else:
+            try:
+                new_nodes = self.gce.ex_create_multiple_nodes(**new_node_arguments)
+        
+            except GoogleBaseError as e:
+                print('GCE Error:', e)
 
         if new_nodes:
             for node in new_nodes:
