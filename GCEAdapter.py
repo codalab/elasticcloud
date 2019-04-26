@@ -335,10 +335,11 @@ class GCEAdapter(ElasticCloudAdapter):
                     new_node = self.gce.create_node(**new_node_arguments)
                 except GoogleBaseError as e:
                     print('GCE Error:', e)
-            if new_node:
-                print("New GPU node running at " + new_node.public_ips[0] + " with name " + new_node.name)
-                # Mark container state as "STARTING"
-                self._set_container_state(new_node.name, GCEAdapter.CONTAINER_STARTING)
+
+                if new_node:
+                    print("New GPU node running at " + new_node.public_ips[0] + " with name " + new_node.name)
+                    # Mark container state as "STARTING"
+                    self._set_container_state(new_node.name, GCEAdapter.CONTAINER_STARTING)
 
         else:
             try:
