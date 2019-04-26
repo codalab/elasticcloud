@@ -36,7 +36,8 @@ class GCEAdapter(ElasticCloudAdapter):
 
     def _configure(self):
         # From config.yaml
-        self.service_account_key = self.config['service_account_key']
+        self.service_account_key = self.config.get('service_account_key')
+        print('service_account_key:',self.service_account_key)
         # If above key is given, this path points to a temp storage version of the above key -- it
         # will be overwritten!
         self.service_account_key_path = self.config['service_account_file']
@@ -71,6 +72,7 @@ class GCEAdapter(ElasticCloudAdapter):
             print(f"Reading from service account key path: {self.service_account_key_path}")
             with open(self.service_account_key_path) as f:
                 service_account = json.load(f)
+                print('Finished loading key')
 
         Driver = get_driver(Provider.GCE)
         self.service_account_email = service_account['client_email']
@@ -208,6 +210,7 @@ class GCEAdapter(ElasticCloudAdapter):
         (stdin, stdout, stderr) = self._run_ssh_command(ip, command)
 
         out = stdout.readlines()
+        print(out)
         container_running = len(out) - 1
 
         if container_running:
