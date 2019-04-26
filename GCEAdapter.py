@@ -327,9 +327,9 @@ class GCEAdapter(ElasticCloudAdapter):
             new_node_arguments["ex_on_host_maintenance"] = "TERMINATE"
             new_node_arguments["ex_accelerator_count"] = 1
             new_node_arguments["ex_accelerator_type"] = "nvidia-tesla-p100"
-
+             
             for i in range(quantity):
-                base_name = 'gpu-' + now.strftime(self.format) + "-{:03d}".format(index)
+                base_name = 'gpu-' + now.strftime(self.format) + "-{:03d}".format(i)
                 print("New GPU node named {}".format(base_name))
                 new_node_arguments['name'] = base_name
                 try:
