@@ -12,6 +12,12 @@ import warnings
 warnings.filterwarnings(action='ignore', module='.*paramiko.*')
 
 
+# Uncomment to enable paramiko logging
+# import logging
+# logging.basicConfig()
+# logging.getLogger("paramiko").setLevel(logging.DEBUG)
+
+
 class ElasticCloudAdapter:
 
     ACTION_SHRINK = 'shrink'
@@ -76,6 +82,7 @@ class ElasticCloudAdapter:
             self.username = "ubuntu"
 
             ssh_key = os.environ.get("GCE_SSH_PRIV")
+            print(f"Unable to find ElasticCloud SSHConfig, attempting to use GCE_SSH_PRIV env var = \n{ssh_key}")
             if ssh_key:
                 self.pkey = paramiko.RSAKey.from_private_key(io.StringIO(ssh_key))
             else:
@@ -96,7 +103,7 @@ class ElasticCloudAdapter:
                         f.write(line)
         try:
             print(f"Attempting to connect to {self.username}@{host}")
-            self.ssh_client.connect(host, username=self.username, pkey=self.pkey)
+            self.ssh_client.connect(host, username=self.username, pkey=self.pkey, timeout=10)
         except (ssh_exception.NoValidConnectionsError, ssh_exception.AuthenticationException):
             print("ERROR :: Could not connect to host, maybe it is spinning up/down?")
 
