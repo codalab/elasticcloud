@@ -111,5 +111,9 @@ cloud_config/config.yaml
 
 # Files for tracking node and container states
 .states/*states
+.gce_states
 
 .idea/
+
+# This file is sourced to load all of the appropriate environment variables for Cloud Cube.
+cloudcubevars
