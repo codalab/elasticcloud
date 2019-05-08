@@ -90,7 +90,7 @@ class GCEAdapter(ElasticCloudAdapter):
         try:
             self.s3_client.download_file(self.s3_bucket_name, self.s3_state_file_location, self.local_state_file_location)
         except ClientError:
-            print('ClientError')
+            print('Boto: ClientError')
             if os.path.exists(self.local_state_file_location) and os.path.getsize(self.local_state_file_location) > 0:
                 self.s3_client.upload_file(self.local_state_file_location, self.s3_bucket_name, self.s3_state_file_location)
             else:
@@ -389,6 +389,7 @@ class GCEAdapter(ElasticCloudAdapter):
         # paramiko ssh
         for node in nodes:
             host = node.public_ips[0]
+            print('{} : {}'.format(node.name, host)) # DEBUG
             try:
                 self._connect(host)
             except (ssh_exception.NoValidConnectionsError, ssh_exception.AuthenticationException):
