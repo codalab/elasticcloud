@@ -385,6 +385,7 @@ class GCEAdapter(ElasticCloudAdapter):
     def dump_state(self):
         node_states = {}
         nodes = self.list_nodes()
+        print(nodes) # DEBUG
 
         # paramiko ssh
         for node in nodes:
