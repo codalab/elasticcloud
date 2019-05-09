@@ -111,6 +111,9 @@ class ElasticCloudAdapter:
         except timeout:
             print('ssh timed out')
             raise
+        except Exception as e:
+            print(e)
+            raise
 
     def _run_ssh_command(self, host, command):
         try:
