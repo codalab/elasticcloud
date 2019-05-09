@@ -204,6 +204,9 @@ class GCEAdapter(ElasticCloudAdapter):
                 node = n
 
         ip = node.public_ips[0]
+        if not ip:
+            print('No external ip address for node {}'.format(node.name))
+            return
             
         command = 'sudo docker ps'
         container_running = 1
@@ -249,6 +252,9 @@ class GCEAdapter(ElasticCloudAdapter):
                 node = n
 
         ip = node.public_ips[0]
+        if not ip:
+            print('No external ip address for node {}'.format(node.name))
+            return
 
         command = 'sudo docker ps'
         container_running = 1
@@ -271,6 +277,9 @@ class GCEAdapter(ElasticCloudAdapter):
                 node = n
 
         ip = node.public_ips[0]
+        if not ip:
+            print('No external ip address for node {}'.format(node.name))
+            return
 
         command = 'sudo docker stop -t 10 ' + container_name
 
@@ -401,6 +410,9 @@ class GCEAdapter(ElasticCloudAdapter):
         # paramiko ssh
         for node in nodes:
             host = node.public_ips[0]
+            if not host:
+                print('No external ip address for node {}'.format(node.name))
+                continue
 
             print('{} : {}'.format(node.name, host)) # DEBUG
             try:
