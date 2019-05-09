@@ -55,7 +55,7 @@ class GCEAdapter(ElasticCloudAdapter):
         self.CLOUDCUBE_ACCESS_KEY_ID = os.environ['CLOUDCUBE_ACCESS_KEY_ID']
         self.CLOUDCUBE_SECRET_ACCESS_KEY = os.environ['CLOUDCUBE_SECRET_ACCESS_KEY']
 
-        self.use_gpus = self.use_gpus == 'True' or self.gpus == 'true'
+        self.use_gpus = self.use_gpus == 'True' or self.use_gpus == 'true'
         print('use_gpus:', self.use_gpus) # DEBUG
         print('use_gpus:', type(self.use_gpus)) # DEBUG
 
