@@ -4,6 +4,7 @@ import os
 import paramiko
 from paramiko import ssh_exception
 import yaml
+from socket import timeout
 
 
 # TODO: When paramiko is updated > 2.4.2 remove this warning squelch

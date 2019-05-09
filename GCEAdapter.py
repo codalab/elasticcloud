@@ -4,6 +4,7 @@ import json
 import copy
 import time
 from datetime import datetime
+from socket import timeout
 
 from paramiko import ssh_exception
 from libcloud.compute.types import Provider
