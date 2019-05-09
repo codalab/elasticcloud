@@ -199,7 +199,11 @@ class GCEAdapter(ElasticCloudAdapter):
             if n.name == node_name:
                 node = n
 
-        ip = node.public_ips[0]
+        if node.public_ips:
+            ip = node.public_ips[0]
+        else:
+            ip = node.private_ips[0]
+            
         command = 'sudo docker ps'
         container_running = 1
         (stdin, stdout, stderr) = self._run_ssh_command(ip, command)
@@ -243,7 +247,11 @@ class GCEAdapter(ElasticCloudAdapter):
             if n.name == node_name:
                 node = n
 
-        ip = node.public_ips[0]
+        if node.public_ips:
+            ip = node.public_ips[0]
+        else:
+            ip = node.private_ips[0]
+
         command = 'sudo docker ps'
         container_running = 1
         while container_running:
@@ -264,7 +272,11 @@ class GCEAdapter(ElasticCloudAdapter):
             if n.name == node_name:
                 node = n
 
-        ip = node.public_ips[0]
+        if node.public_ips:
+            ip = node.public_ips[0]
+        else:
+            ip = node.private_ips[0]
+
         command = 'sudo docker stop -t 10 ' + container_name
 
         (stdin, stdout, stderr) = self._run_ssh_command(ip, command)
@@ -285,7 +297,11 @@ class GCEAdapter(ElasticCloudAdapter):
         nodes = self.list_nodes()
         ips = []
         for n in nodes:
-            ips.append(n.public_ips)
+            if n.public_ips:
+                ips.append(n.public_ips)
+            else:
+                ips.append(n.private_ips)
+
         return ips
 
     def expand(self, quantity):
@@ -336,7 +352,11 @@ class GCEAdapter(ElasticCloudAdapter):
                     print('GCE Error:', e)
 
                 if new_node:
-                    print("New GPU node running at " + new_node.public_ips[0] + " with name " + new_node.name)
+                    if new_node.public_ips:
+                        ip = new_node.public_ips[0]
+                    else:
+                        ip = new_node.private_ips[0]
+                    print("New GPU node running at " + ip + " with name " + new_node.name)
                     # Mark container state as "STARTING"
                     self._set_container_state(new_node.name, GCEAdapter.CONTAINER_STARTING)
 
@@ -349,7 +369,11 @@ class GCEAdapter(ElasticCloudAdapter):
 
             if new_nodes:
                 for node in new_nodes:
-                    print("New node running at " + node.public_ips[0] + " with name " + node.name)
+                    if node.public_ips:
+                        ip = node.public_ips[0]
+                    else:
+                        ip = node.private_ips[0]
+                    print("New node running at " + ip + " with name " + node.name)
                     # Mark container state as "STARTING"
                     self._set_container_state(node.name, GCEAdapter.CONTAINER_STARTING)
 
@@ -390,7 +414,11 @@ class GCEAdapter(ElasticCloudAdapter):
 
         # paramiko ssh
         for node in nodes:
-            host = node.public_ips[0]
+            if node.public_ips:
+                host = node.public_ips[0]
+            else:
+                host = node.private_ips[0]
+
             print('{} : {}'.format(node.name, host)) # DEBUG
             try:
                 self._connect(host)
