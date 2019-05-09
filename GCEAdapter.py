@@ -407,7 +407,7 @@ class GCEAdapter(ElasticCloudAdapter):
             print('{} : {}'.format(node.name, host)) # DEBUG
             try:
                 self._connect(host)
-            except (ssh_exception.NoValidConnectionsError, ssh_exception.AuthenticationException):
+            except (timeout, ssh_exception.NoValidConnectionsError, ssh_exception.AuthenticationException):
                 print("ERROR :: Could not connect to host, maybe it is spinning down?")
                 continue
 
