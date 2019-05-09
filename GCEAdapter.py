@@ -50,11 +50,12 @@ class GCEAdapter(ElasticCloudAdapter):
         self.min_nodes = self.config['min']
         self.EXPAND_CRITERION = self.config['expand_sensitivity']
         self.SHRINK_CRITERION = self.config['shrink_sensitivity']
-        self.use_gpus = self.config.get("use_gpus", False)
+        self.use_gpus = self.config.get("use_gpus", False) 
         self.CLOUDCUBE_URL = os.environ['CLOUDCUBE_URL']
         self.CLOUDCUBE_ACCESS_KEY_ID = os.environ['CLOUDCUBE_ACCESS_KEY_ID']
         self.CLOUDCUBE_SECRET_ACCESS_KEY = os.environ['CLOUDCUBE_SECRET_ACCESS_KEY']
         print('use_gpus:', self.use_gpus) # DEBUG
+        print('use_gpus:', type(self.use_gpus)) # DEBUG
 
     def _load_gce_account(self):
         service_account = None
@@ -317,7 +318,6 @@ class GCEAdapter(ElasticCloudAdapter):
         }
 
         new_nodes = None
-        print('expand: use_gpus:', self.use_gpus) # DEBUG
         if self.use_gpus:
             new_node_arguments = {
                 "name": base_name,
