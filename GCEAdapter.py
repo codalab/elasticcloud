@@ -56,8 +56,6 @@ class GCEAdapter(ElasticCloudAdapter):
         self.CLOUDCUBE_SECRET_ACCESS_KEY = os.environ['CLOUDCUBE_SECRET_ACCESS_KEY']
 
         self.use_gpus = self.use_gpus == 'True' or self.use_gpus == 'true'
-        print('use_gpus:', self.use_gpus) # DEBUG
-        print('use_gpus:', type(self.use_gpus)) # DEBUG
 
     def _load_gce_account(self):
         service_account = None
@@ -316,20 +314,12 @@ class GCEAdapter(ElasticCloudAdapter):
                 print("Only " + str(quantity) + " nodes will start up.")
 
         now = datetime.now()
-        base_name = 'gpu-' + now.strftime(self.format)# + "-{:02d}".format(index)
         print('Creating new VM node...')
 
-        new_node_arguments = {
-            "base_name": base_name,
-            "size": self.size,
-            "image": self.image,
-            "number": quantity,
-            "ignore_errors": False,
-            "ex_service_accounts": [{'email': self.service_account_email, 'scopes': ['compute']}]
-        }
 
         new_nodes = None
         if self.use_gpus:
+            base_name = 'gpu-' + now.strftime(self.format)# + "-{:02d}".format(index)
             new_node_arguments = {
                 "name": base_name,
                 "size": self.size,
@@ -359,6 +349,15 @@ class GCEAdapter(ElasticCloudAdapter):
                     self._set_container_state(new_node.name, GCEAdapter.CONTAINER_STARTING)
 
         else:
+            base_name = 'cpu-' + now.strftime(self.format)# + "-{:02d}".format(index)
+            new_node_arguments = {
+                "base_name": base_name,
+                "size": self.size,
+                "image": self.image,
+                "number": quantity,
+                "ignore_errors": False,
+                "ex_service_accounts": [{'email': self.service_account_email, 'scopes': ['compute']}]
+            }
             try:
                 new_nodes = self.gce.ex_create_multiple_nodes(**new_node_arguments)
         
