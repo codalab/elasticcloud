@@ -199,7 +199,7 @@ class GCEAdapter(ElasticCloudAdapter):
             if n.name == node_name:
                 node = n
 
-        if node.public_ips:
+        if len(node.public_ips):
             ip = node.public_ips[0]
         else:
             ip = node.private_ips[0]
@@ -247,7 +247,7 @@ class GCEAdapter(ElasticCloudAdapter):
             if n.name == node_name:
                 node = n
 
-        if node.public_ips:
+        if len(node.public_ips):
             ip = node.public_ips[0]
         else:
             ip = node.private_ips[0]
@@ -272,7 +272,7 @@ class GCEAdapter(ElasticCloudAdapter):
             if n.name == node_name:
                 node = n
 
-        if node.public_ips:
+        if len(node.public_ips):
             ip = node.public_ips[0]
         else:
             ip = node.private_ips[0]
@@ -297,7 +297,7 @@ class GCEAdapter(ElasticCloudAdapter):
         nodes = self.list_nodes()
         ips = []
         for n in nodes:
-            if n.public_ips:
+            if len(n.public_ips):
                 ips.append(n.public_ips)
             else:
                 ips.append(n.private_ips)
@@ -352,7 +352,7 @@ class GCEAdapter(ElasticCloudAdapter):
                     print('GCE Error:', e)
 
                 if new_node:
-                    if new_node.public_ips:
+                    if len(new_node.public_ips):
                         ip = new_node.public_ips[0]
                     else:
                         ip = new_node.private_ips[0]
@@ -369,7 +369,7 @@ class GCEAdapter(ElasticCloudAdapter):
 
             if new_nodes:
                 for node in new_nodes:
-                    if node.public_ips:
+                    if len(node.public_ips):
                         ip = node.public_ips[0]
                     else:
                         ip = node.private_ips[0]
@@ -414,8 +414,9 @@ class GCEAdapter(ElasticCloudAdapter):
 
         # paramiko ssh
         for node in nodes:
-            if node.public_ips:
+            if len(node.public_ips):
                 host = node.public_ips[0]
+                print("host:", host)
             else:
                 host = node.private_ips[0]
 
