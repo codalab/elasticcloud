@@ -199,10 +199,11 @@ class GCEAdapter(ElasticCloudAdapter):
             if n.name == node_name:
                 node = n
 
-        if len(node.public_ips):
-            ip = node.public_ips[0]
-        else:
-            ip = node.private_ips[0]
+#        if len(node.public_ips):
+#            ip = node.public_ips[0]
+#        else:
+#            ip = node.private_ips[0]
+        ip = node.private_ips[0]
             
         command = 'sudo docker ps'
         container_running = 1
@@ -247,10 +248,11 @@ class GCEAdapter(ElasticCloudAdapter):
             if n.name == node_name:
                 node = n
 
-        if len(node.public_ips):
-            ip = node.public_ips[0]
-        else:
-            ip = node.private_ips[0]
+        ip = node.private_ips[0]
+        #if len(node.public_ips):
+        #    ip = node.public_ips[0]
+        #else:
+        #    ip = node.private_ips[0]
 
         command = 'sudo docker ps'
         container_running = 1
@@ -272,10 +274,11 @@ class GCEAdapter(ElasticCloudAdapter):
             if n.name == node_name:
                 node = n
 
-        if len(node.public_ips):
-            ip = node.public_ips[0]
-        else:
-            ip = node.private_ips[0]
+        ip = node.private_ips[0]
+        #if len(node.public_ips):
+        #    ip = node.public_ips[0]
+        #else:
+        #    ip = node.private_ips[0]
 
         command = 'sudo docker stop -t 10 ' + container_name
 
@@ -297,10 +300,11 @@ class GCEAdapter(ElasticCloudAdapter):
         nodes = self.list_nodes()
         ips = []
         for n in nodes:
-            if len(n.public_ips):
-                ips.append(n.public_ips)
-            else:
-                ips.append(n.private_ips)
+            #if len(n.public_ips):
+            #    ips.append(n.public_ips)
+            #else:
+            #    ips.append(n.private_ips)
+            ips.append(n.private_ips)
 
         return ips
 
@@ -352,10 +356,11 @@ class GCEAdapter(ElasticCloudAdapter):
                     print('GCE Error:', e)
 
                 if new_node:
-                    if len(new_node.public_ips):
-                        ip = new_node.public_ips[0]
-                    else:
-                        ip = new_node.private_ips[0]
+#                    if len(new_node.public_ips):
+#                        ip = new_node.public_ips[0]
+#                    else:
+#                        ip = new_node.private_ips[0]
+                    ip = new_node.private_ips[0]
                     print("New GPU node running at " + ip + " with name " + new_node.name)
                     # Mark container state as "STARTING"
                     self._set_container_state(new_node.name, GCEAdapter.CONTAINER_STARTING)
@@ -369,10 +374,11 @@ class GCEAdapter(ElasticCloudAdapter):
 
             if new_nodes:
                 for node in new_nodes:
-                    if len(node.public_ips):
-                        ip = node.public_ips[0]
-                    else:
-                        ip = node.private_ips[0]
+#                    if len(node.public_ips):
+#                        ip = node.public_ips[0]
+#                    else:
+#                        ip = node.private_ips[0]
+                    ip = node.private_ips[0]
                     print("New node running at " + ip + " with name " + node.name)
                     # Mark container state as "STARTING"
                     self._set_container_state(node.name, GCEAdapter.CONTAINER_STARTING)
@@ -414,11 +420,12 @@ class GCEAdapter(ElasticCloudAdapter):
 
         # paramiko ssh
         for node in nodes:
-            if len(node.public_ips):
-                host = node.public_ips[0]
-                print("host:", host)
-            else:
-                host = node.private_ips[0]
+            host = node.private_ips[0]
+            #if len(node.public_ips):
+            #    host = node.public_ips[0]
+            #    print("host:", host)
+            #else:
+            #    host = node.private_ips[0]
 
             print('{} : {}'.format(node.name, host)) # DEBUG
             try:
