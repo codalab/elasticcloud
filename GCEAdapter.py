@@ -329,6 +329,7 @@ class GCEAdapter(ElasticCloudAdapter):
             for i in range(quantity):
                 base_name = 'gpu-' + now.strftime(self.format) + "-{:03d}".format(i)
                 new_node_arguments['name'] = base_name
+                new_node = None
                 try:
                     new_node = self.gce.create_node(**new_node_arguments)
                 except GoogleBaseError as e:
