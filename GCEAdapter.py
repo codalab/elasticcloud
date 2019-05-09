@@ -316,17 +316,15 @@ class GCEAdapter(ElasticCloudAdapter):
         now = datetime.now()
         print('Creating new VM node...')
 
+        new_node_arguments = {
+            "size": self.size,
+            "image": self.image,
+            "location": self.datacenter,
+            "ex_service_accounts": [{'email': self.service_account_email, 'scopes': ['compute']}]
+        }
 
         new_nodes = None
         if self.use_gpus:
-            base_name = 'gpu-' + now.strftime(self.format)# + "-{:02d}".format(index)
-            new_node_arguments = {
-                "name": base_name,
-                "size": self.size,
-                "image": self.image,
-                "location": self.datacenter,
-                "ex_service_accounts": [{'email': self.service_account_email, 'scopes': ['compute']}]
-            }
 
             print("(note, we doing GPU stuff hoss)")
             new_node_arguments["ex_on_host_maintenance"] = "TERMINATE"
@@ -349,27 +347,20 @@ class GCEAdapter(ElasticCloudAdapter):
                     self._set_container_state(new_node.name, GCEAdapter.CONTAINER_STARTING)
 
         else:
-            base_name = 'cpu-' + now.strftime(self.format)# + "-{:02d}".format(index)
-            new_node_arguments = {
-                "base_name": base_name,
-                "size": self.size,
-                "image": self.image,
-                "number": quantity,
-                "ignore_errors": False,
-                "ex_service_accounts": [{'email': self.service_account_email, 'scopes': ['compute']}]
-            }
-            try:
-                new_nodes = self.gce.ex_create_multiple_nodes(**new_node_arguments)
-        
-            except GoogleBaseError as e:
-                print('GCE Error:', e)
+            for i in range(quantity):
+                base_name = 'cpu-' + now.strftime(self.format) + "-{:03d}".format(i)
+                new_node_arguments['name'] = base_name
+                new_node = None
+                try:
+                    new_node = self.gce.create_node(**new_node_arguments)
+                except GoogleBaseError as e:
+                    print('GCE Error:', e)
 
-            if new_nodes:
-                for node in new_nodes:
-                    ip = node.public_ips[0]
-                    print("New node running at " + ip + " with name " + node.name)
+                if new_node:
+                    ip = new_node.public_ips[0]
+                    print("New CPU node running at " + ip + " with name " + new_node.name)
                     # Mark container state as "STARTING"
-                    self._set_container_state(node.name, GCEAdapter.CONTAINER_STARTING)
+                    self._set_container_state(new_node.name, GCEAdapter.CONTAINER_STARTING)
 
 
     def shrink(self, quantity):
