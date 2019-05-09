@@ -414,6 +414,7 @@ class GCEAdapter(ElasticCloudAdapter):
             commands = ['ls -la /tmp/codalab | wc -l']
 
             for command in commands:
+                print('host:', host)
                 stdin, stdout, stderr = self.ssh_client.exec_command(command)
                 s = stdout.readlines()
                 if command == 'ls -la /tmp/codalab | wc -l':
