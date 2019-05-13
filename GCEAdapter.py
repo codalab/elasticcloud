@@ -5,6 +5,7 @@ import copy
 import time
 from datetime import datetime
 from socket import timeout
+from distutils.util import strtobool
 
 from paramiko import ssh_exception
 from libcloud.compute.types import Provider
@@ -51,12 +52,10 @@ class GCEAdapter(ElasticCloudAdapter):
         self.min_nodes = self.config['min']
         self.EXPAND_CRITERION = self.config['expand_sensitivity']
         self.SHRINK_CRITERION = self.config['shrink_sensitivity']
-        self.use_gpus = self.config.get("use_gpus", False) 
+        self.use_gpus = strtobool(str(self.config.get("use_gpus", "False")))
         self.CLOUDCUBE_URL = os.environ['CLOUDCUBE_URL']
         self.CLOUDCUBE_ACCESS_KEY_ID = os.environ['CLOUDCUBE_ACCESS_KEY_ID']
         self.CLOUDCUBE_SECRET_ACCESS_KEY = os.environ['CLOUDCUBE_SECRET_ACCESS_KEY']
-
-        self.use_gpus = self.use_gpus == 'True' or self.use_gpus == 'true'
 
     def _load_gce_account(self):
         service_account = None
