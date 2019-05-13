@@ -195,15 +195,8 @@ class GCEAdapter(ElasticCloudAdapter):
         self._store_states(stored_states, 'container')
 
     def _update_container_state(self, node_name):
-        # get ip from node name
-        node = None
-        for n in self.list_nodes():
-            if n.name == node_name:
-                node = n
-
-        ip = node.public_ips[0]
+        ip = self.get_node_ip(node_name)
         if not ip:
-            print('No external ip address for node {}'.format(node.name))
             return
             
         command = 'sudo docker ps'
@@ -243,15 +236,8 @@ class GCEAdapter(ElasticCloudAdapter):
     def _wait_for_node_container_shutdown(self, node_name):
         print("node_name:", node_name) # DEBUG
 
-        # get ip from node name
-        node = None
-        for n in self.list_nodes():
-            if n.name == node_name:
-                node = n
-
-        ip = node.public_ips[0]
+        ip = self.get_node_ip(node_name)
         if not ip:
-            print('No external ip address for node {}'.format(node.name))
             return
 
         command = 'sudo docker ps'
@@ -269,14 +255,8 @@ class GCEAdapter(ElasticCloudAdapter):
             time.sleep(0.5)
 
     def _stop_container(self, node_name, container_name):
-        node = None
-        for n in self.list_nodes():
-            if n.name == node_name:
-                node = n
-
-        ip = node.public_ips[0]
+        ip = self.get_node_ip(node_name)
         if not ip:
-            print('No external ip address for node {}'.format(node.name))
             return
 
         command = 'sudo docker stop -t 10 ' + container_name
@@ -295,13 +275,18 @@ class GCEAdapter(ElasticCloudAdapter):
             names.append(n.name)
         return names
 
-    def get_node_ips(self):
-        nodes = self.list_nodes()
-        ips = []
-        for n in nodes:
-            ips.append(n.public_ips)
+    def get_node_ip(self, node_name):
+        node = None
+        for n in self.list_nodes():
+            if n.name == node_name:
+                node = n
 
-        return ips
+        ip = node.public_ips[0]
+
+        if not ip:
+            print('No external ip address for node {}'.format(node.name))
+
+        return ip
 
     def expand(self, quantity):
         current_quantity = self.get_node_quantity()
