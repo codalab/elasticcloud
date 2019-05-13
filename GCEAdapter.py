@@ -307,7 +307,7 @@ class GCEAdapter(ElasticCloudAdapter):
     def expand(self, quantity):
         current_quantity = self.get_node_quantity()
         if current_quantity + quantity > self.max_nodes:
-            if current_quantity >= self.max_node:
+            if current_quantity >= self.max_nodes:
                 print("Already " + str(self.get_node_quantity()) + " nodes running. (max)")
             else: 
                 quantity = self.max_nodes - current_quantity
