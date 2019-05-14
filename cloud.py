@@ -49,6 +49,7 @@ def dump_state(driver):
 
     adapter.update_all_states()
     states = adapter.dump_state()
+    print("cloud.py: after dump-state")
     output_format = '{0: <30} {1}'
     click.echo(output_format.format('Name', 'State'))
     for name in states:

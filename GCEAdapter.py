@@ -4,6 +4,8 @@ import json
 import copy
 import time
 from datetime import datetime
+from socket import timeout
+from distutils.util import strtobool
 
 from paramiko import ssh_exception
 from libcloud.compute.types import Provider
@@ -50,7 +52,7 @@ class GCEAdapter(ElasticCloudAdapter):
         self.min_nodes = self.config['min']
         self.EXPAND_CRITERION = self.config['expand_sensitivity']
         self.SHRINK_CRITERION = self.config['shrink_sensitivity']
-        self.use_gpus = self.config.get("use_gpus", False)
+        self.use_gpus = strtobool(str(self.config.get("use_gpus", "False")))
         self.CLOUDCUBE_URL = os.environ['CLOUDCUBE_URL']
         self.CLOUDCUBE_ACCESS_KEY_ID = os.environ['CLOUDCUBE_ACCESS_KEY_ID']
         self.CLOUDCUBE_SECRET_ACCESS_KEY = os.environ['CLOUDCUBE_SECRET_ACCESS_KEY']
@@ -90,7 +92,7 @@ class GCEAdapter(ElasticCloudAdapter):
         try:
             self.s3_client.download_file(self.s3_bucket_name, self.s3_state_file_location, self.local_state_file_location)
         except ClientError:
-            print('ClientError')
+            print('Boto: ClientError')
             if os.path.exists(self.local_state_file_location) and os.path.getsize(self.local_state_file_location) > 0:
                 self.s3_client.upload_file(self.local_state_file_location, self.s3_bucket_name, self.s3_state_file_location)
             else:
@@ -193,13 +195,10 @@ class GCEAdapter(ElasticCloudAdapter):
         self._store_states(stored_states, 'container')
 
     def _update_container_state(self, node_name):
-        # get ip from node name
-        node = None
-        for n in self.list_nodes():
-            if n.name == node_name:
-                node = n
-
-        ip = node.public_ips[0]
+        ip = self.get_node_ip(node_name)
+        if not ip:
+            return
+            
         command = 'sudo docker ps'
         container_running = 1
         (stdin, stdout, stderr) = self._run_ssh_command(ip, command)
@@ -237,13 +236,10 @@ class GCEAdapter(ElasticCloudAdapter):
     def _wait_for_node_container_shutdown(self, node_name):
         print("node_name:", node_name) # DEBUG
 
-        # get ip from node name
-        node = None
-        for n in self.list_nodes():
-            if n.name == node_name:
-                node = n
+        ip = self.get_node_ip(node_name)
+        if not ip:
+            return
 
-        ip = node.public_ips[0]
         command = 'sudo docker ps'
         container_running = 1
         while container_running:
@@ -259,12 +255,10 @@ class GCEAdapter(ElasticCloudAdapter):
             time.sleep(0.5)
 
     def _stop_container(self, node_name, container_name):
-        node = None
-        for n in self.list_nodes():
-            if n.name == node_name:
-                node = n
+        ip = self.get_node_ip(node_name)
+        if not ip:
+            return
 
-        ip = node.public_ips[0]
         command = 'sudo docker stop -t 10 ' + container_name
 
         (stdin, stdout, stderr) = self._run_ssh_command(ip, command)
@@ -281,17 +275,23 @@ class GCEAdapter(ElasticCloudAdapter):
             names.append(n.name)
         return names
 
-    def get_node_ips(self):
-        nodes = self.list_nodes()
-        ips = []
-        for n in nodes:
-            ips.append(n.public_ips)
-        return ips
+    def get_node_ip(self, node_name):
+        node = None
+        for n in self.list_nodes():
+            if n.name == node_name:
+                node = n
+
+        ip = node.public_ips[0]
+
+        if not ip:
+            print('No external ip address for node {}'.format(node.name))
+
+        return ip
 
     def expand(self, quantity):
         current_quantity = self.get_node_quantity()
         if current_quantity + quantity > self.max_nodes:
-            if current_quantity >= self.max_node:
+            if current_quantity >= self.max_nodes:
                 print("Already " + str(self.get_node_quantity()) + " nodes running. (max)")
             else: 
                 quantity = self.max_nodes - current_quantity
@@ -299,27 +299,17 @@ class GCEAdapter(ElasticCloudAdapter):
                 print("Only " + str(quantity) + " nodes will start up.")
 
         now = datetime.now()
-        base_name = 'gpu-' + now.strftime(self.format)# + "-{:02d}".format(index)
         print('Creating new VM node...')
 
         new_node_arguments = {
-            "base_name": base_name,
             "size": self.size,
             "image": self.image,
-            "number": quantity,
-            "ignore_errors": False,
+            "location": self.datacenter,
             "ex_service_accounts": [{'email': self.service_account_email, 'scopes': ['compute']}]
         }
 
         new_nodes = None
         if self.use_gpus:
-            new_node_arguments = {
-                "name": base_name,
-                "size": self.size,
-                "image": self.image,
-                "location": self.datacenter,
-                "ex_service_accounts": [{'email': self.service_account_email, 'scopes': ['compute']}]
-            }
 
             print("(note, we doing GPU stuff hoss)")
             new_node_arguments["ex_on_host_maintenance"] = "TERMINATE"
@@ -329,28 +319,33 @@ class GCEAdapter(ElasticCloudAdapter):
             for i in range(quantity):
                 base_name = 'gpu-' + now.strftime(self.format) + "-{:03d}".format(i)
                 new_node_arguments['name'] = base_name
+                new_node = None
                 try:
                     new_node = self.gce.create_node(**new_node_arguments)
                 except GoogleBaseError as e:
                     print('GCE Error:', e)
 
                 if new_node:
-                    print("New GPU node running at " + new_node.public_ips[0] + " with name " + new_node.name)
+                    ip = new_node.public_ips[0]
+                    print("New GPU node running at " + ip + " with name " + new_node.name)
                     # Mark container state as "STARTING"
                     self._set_container_state(new_node.name, GCEAdapter.CONTAINER_STARTING)
 
         else:
-            try:
-                new_nodes = self.gce.ex_create_multiple_nodes(**new_node_arguments)
-        
-            except GoogleBaseError as e:
-                print('GCE Error:', e)
+            for i in range(quantity):
+                base_name = 'cpu-' + now.strftime(self.format) + "-{:03d}".format(i)
+                new_node_arguments['name'] = base_name
+                new_node = None
+                try:
+                    new_node = self.gce.create_node(**new_node_arguments)
+                except GoogleBaseError as e:
+                    print('GCE Error:', e)
 
-            if new_nodes:
-                for node in new_nodes:
-                    print("New node running at " + node.public_ips[0] + " with name " + node.name)
+                if new_node:
+                    ip = new_node.public_ips[0]
+                    print("New CPU node running at " + ip + " with name " + new_node.name)
                     # Mark container state as "STARTING"
-                    self._set_container_state(node.name, GCEAdapter.CONTAINER_STARTING)
+                    self._set_container_state(new_node.name, GCEAdapter.CONTAINER_STARTING)
 
 
     def shrink(self, quantity):
@@ -385,19 +380,26 @@ class GCEAdapter(ElasticCloudAdapter):
     def dump_state(self):
         node_states = {}
         nodes = self.list_nodes()
+        print(nodes) # DEBUG
 
         # paramiko ssh
         for node in nodes:
             host = node.public_ips[0]
+            if not host:
+                print('No external ip address for node {}'.format(node.name))
+                continue
+
+            print('{} : {}'.format(node.name, host)) # DEBUG
             try:
                 self._connect(host)
-            except (ssh_exception.NoValidConnectionsError, ssh_exception.AuthenticationException):
+            except (timeout, ssh_exception.NoValidConnectionsError, ssh_exception.AuthenticationException):
                 print("ERROR :: Could not connect to host, maybe it is spinning down?")
                 continue
 
             commands = ['ls -la /tmp/codalab | wc -l']
 
             for command in commands:
+                print('host:', host)
                 stdin, stdout, stderr = self.ssh_client.exec_command(command)
                 s = stdout.readlines()
                 if command == 'ls -la /tmp/codalab | wc -l':
