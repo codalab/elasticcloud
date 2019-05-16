@@ -118,6 +118,9 @@ class ElasticCloudAdapter:
     def _run_ssh_command(self, host, command):
         try:
             self._connect(host)
+        except timeout:
+            print('ssh timed out')
+            raise
         except (ssh_exception.NoValidConnectionsError, ssh_exception.AuthenticationException):
             print("ERROR :: Could not connect to host, maybe it is spinning down?")
         try:

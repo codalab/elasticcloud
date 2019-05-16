@@ -201,7 +201,11 @@ class GCEAdapter(ElasticCloudAdapter):
             
         command = 'sudo docker ps'
         container_running = 1
-        (stdin, stdout, stderr) = self._run_ssh_command(ip, command)
+        try:
+            (stdin, stdout, stderr) = self._run_ssh_command(ip, command)
+        except timeout:
+            print('ssh timed out')
+            return
 
         out = stdout.readlines()
         print(out)
@@ -243,7 +247,11 @@ class GCEAdapter(ElasticCloudAdapter):
         command = 'sudo docker ps'
         container_running = 1
         while container_running:
-            (stdin, stdout, stderr) = self._run_ssh_command(ip, command)
+            try:
+                (stdin, stdout, stderr) = self._run_ssh_command(ip, command)
+            except timeout:
+                print('ssh timed out')
+                return
 
             out = stdout.readlines()
             container_running = len(out) - 1
@@ -261,9 +269,11 @@ class GCEAdapter(ElasticCloudAdapter):
 
         command = 'sudo docker stop -t 10 ' + container_name
 
-        (stdin, stdout, stderr) = self._run_ssh_command(ip, command)
-        #print(stdout.readlines()) # DEBUG
-        #print(stderr.readlines()) # DEBUG
+        try:
+            (stdin, stdout, stderr) = self._run_ssh_command(ip, command)
+        except timeout:
+            print('ssh timed out')
+            return
 
     def get_node_quantity(self):
         return len(self.list_nodes())
